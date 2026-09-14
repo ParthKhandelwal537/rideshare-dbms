@@ -29,7 +29,6 @@ An enterprise-grade, evaluation-ready relational ridesharing and multi-user cab 
   - [Database Setup & Seeding](#database-setup--seeding)
   - [Running the Application](#running-the-application)
 - [API Reference & CRUD Operations](#-api-reference--crud-operations)
-- [DBMS CIA 3 Evaluation & Viva Reference](#-dbms-cia-3-evaluation--viva-reference)
 
 ---
 
@@ -340,12 +339,4 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 | `/api/payments` | `GET`, `PATCH` | Retrieve payments or complete transaction | 1:1 Payment status update |
 | `/api/admin/overview`| `GET` | Fetch all tables and joined view data | **Relational View** join query |
 
----
-
-## 🎓 DBMS CIA 3 Evaluation & Viva Reference
-
-For full viva defense, schema justifications, and step-by-step evaluation flows, refer to:
-- 📖 [EVALUATION_CHEAT_SHEET.md](EVALUATION_CHEAT_SHEET.md) — Viva definitions (Super Key vs. Candidate Key, 1:1 vs. 1:M mapping, Trigger logic, and Cascade rules).
-- 📐 [ER_DIAGRAM_SPECIFICATION.md](ER_DIAGRAM_SPECIFICATION.md) — Formal ER diagram specifications and constraint walkthroughs.
-- 🧪 [supabase/test_queries.sql](supabase/test_queries.sql) — Sample SQL evaluation queries ready to run during live demonstration.
 
