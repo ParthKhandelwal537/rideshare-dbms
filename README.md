@@ -72,6 +72,31 @@ graph TD
 
 ### Entity-Relationship Diagram
 
+![RideShare ER Diagram](./ER%20DIAGRAM.jpeg)
+
+#### Conceptual ER Design (Chen Notation Breakdown)
+
+The diagram above models the system in standard DBMS **Chen notation**:
+
+- **Entities (Rectangles):**
+  - **`User`**: Strong entity with primary key `User Id`. Key attributes: `Name`, `Email`, `Location`, and multivalued `Phone no.` (double oval).
+  - **`Driver`**: Strong entity with primary key `Driver-id`. Attributes: `Driver_name`, `Phone-no.`, `License-no.`, and `Ratings`.
+  - **`Vehicle`**: Strong entity with primary key `Vehicle_id`. Attributes: `Vehicle-number`, `Vehicle_type`, `Capacity` (derived/seat limit), and reference `Driver Id`.
+  - **`Ride`**: Core entity with primary key `Ride-id`. Attributes: `Pick up location`, `Drop off location`, `Ride Date`, `User Id`, and derived `Fare` (dashed oval).
+  - **`Payments`**: Weak / dependent entity (double rectangle) linked to `Ride`, with primary key `Payment_id`, attributes `Amount`, `Payment Status`, `Payment Mode`, and foreign key references `Ride Id` and `User Id`.
+  - **`Review`** *(labeled `Preview` in diagram box)*: Weak / dependent entity (double rectangle) with primary key `Review Id`, multivalued `Ratings`, and `Comments`.
+- **Relationships (Diamonds) & Cardinalities:**
+  - **`books` (1 : M):** 1 `User` books many (`M`) `Ride` instances.
+  - **`Accepts` (1 : M):** 1 `Driver` accepts many (`M`) `Ride` instances.
+  - **`Own` (1 : 1):** 1 `Driver` owns 1 `Vehicle` (enforced via relational `UNIQUE` constraint on `driver_id`).
+  - **`Has` (1 : 1):** 1 `Ride` has 1 `Payments` record (enforced via relational `UNIQUE` constraint with `ON DELETE CASCADE`).
+  - **`gives` (1 : M):** 1 `User` gives many (`M`) `Review` entries.
+
+> **💡 Slight ER Diagram Refinement Notes:**
+> 1. **Entity Box Typo (`Preview` $\to$ `Review`):** The hand-drawn entity box reads `Preview`, but its primary key attribute is explicitly labeled `Review Id`. In our relational schema and API, this corresponds to `reviews`.
+> 2. **Derived Attribute (`Fare`):** `Fare` is drawn with a **dashed oval**. In this implementation, fare is computed dynamically server-side by the PostgreSQL trigger `trg_calculate_fare` using the Haversine distance between Bangalore coordinates.
+> 3. **Weak Entities (Double Rectangles):** `Payments` and `Review` depend existentially on their parent relations, reinforced by `ON DELETE CASCADE` and foreign key integrity.
+
 ```mermaid
 erDiagram
     USERS ||--o{ RIDES : "books (1:M)"

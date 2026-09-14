@@ -7,12 +7,16 @@
 
 ## 1. Executive Summary: ER Diagram Alignment
 
-This document outlines the **exact alignment between the hand-drawn ER diagram and the live implementation**. 
+![RideShare ER Diagram](./ER%20DIAGRAM.jpeg)
 
-The model **does NOT deviate** from your original submission:
-- **Zero core entities added or removed:** All 6 original entities (`Users`, `Driver`, `Vehicle`, `Ride`, `Payment`, `Review`) remain the foundation.
-- **Zero relationships rewired:** All 5 relational connections (`books`, `accepts`, `owns`, `has`, `gives`) retain their exact cardinalities.
-- **Natural Attribute Refinements:** Minor descriptive attributes (`ride_status`, `ride_type`, `passengers_count` on `Ride`, and `rating` on `Review`) were incorporated so that application features (Ride Tracking, Multi-User Cab Pooling, and Driver Ratings) map directly to relational attributes.
+This document outlines the **exact alignment between the conceptual Chen-notation ER diagram and the live PostgreSQL implementation**. 
+
+The implementation **faithfully mirrors the ER diagram**:
+- **Zero core entities added or removed:** All 6 original entities (`User`, `Driver`, `Vehicle`, `Ride`, `Payments`, `Review`) remain the structural foundation.
+- **Zero relationships rewired:** All 5 relational connections (`books`, `Accepts`, `Own`, `Has`, `gives`) retain their exact cardinalities (1:M and 1:1).
+- **Derived Attribute Realization:** In the diagram, **`Fare`** is drawn with a **dashed oval**, indicating a **derived attribute**. This is realized via PostgreSQL trigger `trg_calculate_fare` using the Haversine distance formula between pickup and dropoff points.
+- **Slight Label Clarification:** The entity box labeled **`Preview`** in the drawing represents **`Review`**, as evidenced by its primary key attribute **`Review Id`** and its semantic relationship (`gives`).
+- **Weak Entity Representation:** `Payments` and `Review` are drawn with double rectangles (weak/associative entities), which our relational schema enforces via foreign keys with `ON DELETE CASCADE` (`payments` cannot exist without `rides`).
 
 ```mermaid
 erDiagram
