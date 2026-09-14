@@ -92,11 +92,6 @@ The diagram above models the system in standard DBMS **Chen notation**:
   - **`Has` (1 : 1):** 1 `Ride` has 1 `Payments` record (enforced via relational `UNIQUE` constraint with `ON DELETE CASCADE`).
   - **`gives` (1 : M):** 1 `User` gives many (`M`) `Review` entries.
 
-> **💡 Slight ER Diagram Refinement Notes:**
-> 1. **Entity Box Typo (`Preview` $\to$ `Review`):** The hand-drawn entity box reads `Preview`, but its primary key attribute is explicitly labeled `Review Id`. In our relational schema and API, this corresponds to `reviews`.
-> 2. **Derived Attribute (`Fare`):** `Fare` is drawn with a **dashed oval**. In this implementation, fare is computed dynamically server-side by the PostgreSQL trigger `trg_calculate_fare` using the Haversine distance between Bangalore coordinates.
-> 3. **Weak Entities (Double Rectangles):** `Payments` and `Review` depend existentially on their parent relations, reinforced by `ON DELETE CASCADE` and foreign key integrity.
-
 ```mermaid
 erDiagram
     USERS ||--o{ RIDES : "books (1:M)"
