@@ -30,7 +30,6 @@ An enterprise-grade, evaluation-ready relational ridesharing and multi-user cab 
   - [Running the Application](#running-the-application)
 - [API Reference & CRUD Operations](#-api-reference--crud-operations)
 - [DBMS CIA 3 Evaluation & Viva Reference](#-dbms-cia-3-evaluation--viva-reference)
-- [Contributors & License](#-contributors--license)
 
 ---
 
@@ -330,10 +329,3 @@ For full viva defense, schema justifications, and step-by-step evaluation flows,
 - 📐 [ER_DIAGRAM_SPECIFICATION.md](ER_DIAGRAM_SPECIFICATION.md) — Formal ER diagram specifications and constraint walkthroughs.
 - 🧪 [supabase/test_queries.sql](supabase/test_queries.sql) — Sample SQL evaluation queries ready to run during live demonstration.
 
----
-
-## 👥 Contributors & License
-
-- **Developer & Designer:** Parth Sharma (2nd Year B.Tech CSE, Christ University)
-- **Academic Submission:** DBMS CIA 3 Deliverable
-- **License:** Open for academic reference and educational evaluation.
