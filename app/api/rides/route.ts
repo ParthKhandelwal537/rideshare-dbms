@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getRides, bookRide } from '@/lib/db';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const user_id = searchParams.get('user_id') || undefined;
+    const driver_id = searchParams.get('driver_id') || undefined;
+
+    const rides = await getRides({ user_id, driver_id });
+    return NextResponse.json({ success: true, data: rides });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error.message || 'Failed to fetch rides' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { user_id, pickup_location, dropoff_location, ride_date, ride_type, passengers_count, is_scheduled, departure_time } = body;
+
+    if (!user_id || !pickup_location || !dropoff_location) {
+      return NextResponse.json(
+        { success: false, message: 'User, pickup, and dropoff locations are required.' },
+        { status: 400 }
+      );
+    }
+
+    if (pickup_location === dropoff_location) {
+      return NextResponse.json(
+        { success: false, message: "Pickup and dropoff can't be the same." },
+        { status: 400 }
+      );
+    }
+
+    const { ride, payment } = await bookRide({
+      user_id,
+      pickup_location,
+      dropoff_location,
+      ride_date: ride_date || new Date().toISOString().split('T')[0],
+      ride_type: ride_type || 'solo',
+      passengers_count: passengers_count ? parseInt(passengers_count, 10) : 1,
+      is_scheduled: !!is_scheduled,
+      departure_time
+    });
+
+    const isShared = ride.ride_type === 'shared';
+    return NextResponse.json(
+      {
+        success: true,
+        message: isShared
+          ? `Shared cab booked — discounted fare ₹${ride.fare} (30% pool discount).`
+          : `Ride booked — fare ₹${ride.fare}.`,
+        data: { ride, payment }
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    const isClientError =
+      error.message.includes('No drivers available') ||
+      error.message.includes("Pickup and dropoff can't be the same") ||
+      error.message.includes('exceeds vehicle capacity');
+    return NextResponse.json(
+      { success: false, message: error.message || 'Failed to book ride' },
+      { status: isClientError ? 400 : 500 }
+    );
+  }
+}
