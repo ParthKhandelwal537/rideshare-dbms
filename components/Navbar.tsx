@@ -16,7 +16,8 @@ export default function Navbar() {
   }, []);
 
   const navItems = [
-    { label: currentUser ? 'Dashboard' : 'Home', href: currentUser ? '/dashboard' : '/', icon: LayoutDashboard },
+    { label: 'Home', href: '/', icon: Car },
+    ...(currentUser ? [{ label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard }] : []),
     { label: 'Book Ride', href: '/book', icon: PlusCircle },
     { label: 'Admin / Live DB', href: '/admin', icon: Database },
   ];

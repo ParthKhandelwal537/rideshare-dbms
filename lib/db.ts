@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { User, Driver, Vehicle, LocationItem, Ride, Payment, Review, RideFullDetails, RideStatus, RideType, CoRider } from './types';
 import { LOCATIONS_DATA, calculateFareForLocations, isLocationOnRoute, isDateTimeCompatible, RouteMatchResult } from './fare';
+import { formatFriendlyId, generateSimplifiedUuid } from './idHelper';
 
 export interface RideDynamicMeta {
   status: RideStatus;
@@ -677,18 +678,6 @@ export async function bookRide(params: {
       passengers_count: passengers,
       departure_time: departureTime,
       is_scheduled: isScheduled,
-      co_riders: []
-    };
-
-    // Auto-dispatch invites to eligible corridor riders if opted for shared ride
-    if (rideType === 'shared') {
-      try {
-        await autoDispatchPoolInvites(rideId);
-      } catch (e) {
-        console.error('Auto-dispatch error in Supabase mode:', e);
-      }
-    }
-
     return { ride: fullRide, payment: paymentData };
   }
 
@@ -719,15 +708,6 @@ export async function bookRide(params: {
 
   memoryStore.rides.unshift(newRide);
   memoryStore.payments.unshift(newPayment);
-
-  // Auto-dispatch invites to eligible corridor riders if opted for shared ride
-  if (rideType === 'shared') {
-    try {
-      await autoDispatchPoolInvites(rideId);
-    } catch (e) {
-      console.error('Auto-dispatch error in memory mode:', e);
-    }
-  }
 
   return { ride: newRide, payment: newPayment };
 }
@@ -855,6 +835,11 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
   const currentCoRiders = currentRide.co_riders || [];
   const vehicleCapacity = currentDetail.vehicle?.capacity || 4;
 
+  // If user selected a private solo ride, no pool matches or invites needed
+  if (currentRide.ride_type === 'solo') {
+    return [];
+  }
+
   // If vehicle is already at max capacity, no more matches allowed
   if (1 + currentCoRiders.length >= vehicleCapacity) {
     return [];
@@ -886,6 +871,12 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
       continue;
     }
 
+    // Candidate must have chosen a shared ride (respect solo rider preference)
+    const candidateType = cached?.ride_type || candidate.ride_type || 'solo';
+    if (candidateType === 'solo') {
+      continue;
+    }
+
     const rider = users.find(u => u.user_id === candidate.user_id);
     const riderName = rider ? rider.name : 'Verified Rider';
     const riderNumber = rider?.number || null;
@@ -914,10 +905,10 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
       continue;
     }
 
-    // Match Departure Time: allowable deviation window <= 45 minutes
+    // Match Departure Time: allowable deviation window <= 30 minutes (not exceeding half an hour)
     const candTime = cached?.departure_time || candidate.departure_time || '20:30';
     const currTime = currentRide.departure_time || '20:30';
-    const timeMatch = isDateTimeCompatible(currDate, currTime, candDate, candTime, 45);
+    const timeMatch = isDateTimeCompatible(currDate, currTime, candDate, candTime, 30);
     if (!timeMatch.isMatch) {
       continue;
     }

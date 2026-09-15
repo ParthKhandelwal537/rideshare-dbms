@@ -749,7 +749,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
                         </span>
                       </div>
                       <p className="text-xs text-slate-300">
-                        We are trying to match you with other people along your route. Automatic invites have been dispatched to eligible riders along your corridor. As soon as a co-rider accepts, this notification will clear and their profile will appear here!
+                        Scanning for eligible riders along your route corridor (with departure deviation &le; 30 minutes). Once matched riders join, this banner will clear and pool discounts will apply!
                       </p>
                     </div>
                   </div>
@@ -882,8 +882,8 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
 
           <div className="text-xs text-slate-400">
             {sharingType === 'solo'
-              ? 'Even as a solo rider, you can invite or receive invites from any rider travelling along your route corridor. Once accepted, your ride automatically converts to a shared pool and your fare drops by 30% (with automatic refund if already paid)!'
-              : 'The app automatically sends invites to all eligible riders on your route corridor (both solo and shared) on a first-come, first-served basis up to vehicle capacity. When someone accepts, you are instantly paired and dynamic pooling discounts apply!'}
+              ? 'You have chosen a private Solo Ride. No automatic pool matching or invitations are dispatched for solo trips. If you wish to pool and save 30%, switch to Shared Cab above.'
+              : 'Shared Pool Ride: Automatically matches with active riders along this route or slightly deviating corridor (departure deviation &le; 30 minutes). You can pool together with 1-click on a first-come, first-served basis up to vehicle capacity!'}
           </div>
 
           {matchedBookedRides.length === 0 ? (
