@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { User, Driver, Vehicle, LocationItem, Ride, Payment, Review, RideFullDetails, RideStatus, RideType, CoRider } from './types';
-import { LOCATIONS_DATA, calculateFareForLocations, isLocationOnRoute, RouteMatchResult } from './fare';
+import { LOCATIONS_DATA, calculateFareForLocations, isLocationOnRoute, isDateTimeCompatible, RouteMatchResult } from './fare';
 
 export interface RideDynamicMeta {
   status: RideStatus;
@@ -12,6 +12,10 @@ export interface RideDynamicMeta {
   refund_amount?: number;
   original_amount_paid?: number;
   co_riders: CoRider[];
+  vehicle_type_preference?: string;
+  seating_capacity_preference?: number;
+  assigned_vehicle_type?: string;
+  assigned_capacity?: number;
 }
 
 export interface PoolInvite {
@@ -22,6 +26,8 @@ export interface PoolInvite {
   sender_name: string;
   receiver_user_id: string;
   receiver_name: string;
+  sender_pickup?: string;
+  sender_dropoff?: string;
   status: 'pending' | 'accepted' | 'declined';
   created_at: string;
 }
@@ -82,13 +88,23 @@ const memoryStore = {
   drivers: [
     { driver_id: 'aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Rajesh Kumar', phone_no: '9811223344', license_no: 'DL-KA-01-2019001', ratings: 4.8 },
     { driver_id: 'aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Vikram Singh', phone_no: '9822334455', license_no: 'DL-KA-02-2020002', ratings: 4.9 },
-    { driver_id: 'aaaaaaa3-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Mohammed Farhan', phone_no: '9833445566', license_no: 'DL-KA-03-2021003', ratings: 4.7 }
+    { driver_id: 'aaaaaaa3-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Mohammed Farhan', phone_no: '9833445566', license_no: 'DL-KA-03-2021003', ratings: 4.7 },
+    { driver_id: 'aaaaaaa4-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Suresh Nair', phone_no: '9844556677', license_no: 'DL-KA-04-2021004', ratings: 4.9 },
+    { driver_id: 'aaaaaaa5-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Karthik Reddy', phone_no: '9855667788', license_no: 'DL-KA-05-2022005', ratings: 4.8 },
+    { driver_id: 'aaaaaaa6-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Deepa Patil', phone_no: '9866778899', license_no: 'DL-KA-06-2022006', ratings: 4.9 },
+    { driver_id: 'aaaaaaa7-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Harish Gowda', phone_no: '9877889900', license_no: 'DL-KA-07-2023007', ratings: 4.7 },
+    { driver_id: 'aaaaaaa8-aaaa-aaaa-aaaa-aaaaaaaaaaaa', driver_name: 'Anand Verma', phone_no: '9888990011', license_no: 'DL-KA-08-2023008', ratings: 4.8 }
   ] as Driver[],
 
   vehicles: [
     { vehicle_id: 'bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-01-AB-1234', vehicle_type: 'Sedan (Toyota Etios)', capacity: 4, driver_id: 'aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
     { vehicle_id: 'bbbbbbb2-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-05-CD-5678', vehicle_type: 'SUV (Hyundai Creta)', capacity: 6, driver_id: 'aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
-    { vehicle_id: 'bbbbbbb3-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-03-EF-9012', vehicle_type: 'Hatchback (Maruti Swift)', capacity: 4, driver_id: 'aaaaaaa3-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }
+    { vehicle_id: 'bbbbbbb3-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-03-EF-9012', vehicle_type: 'Hatchback (Maruti Swift)', capacity: 4, driver_id: 'aaaaaaa3-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    { vehicle_id: 'bbbbbbb4-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-02-GH-3456', vehicle_type: 'Sedan (Honda City)', capacity: 4, driver_id: 'aaaaaaa4-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    { vehicle_id: 'bbbbbbb5-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-04-IJ-7890', vehicle_type: 'SUV (Toyota Innova)', capacity: 6, driver_id: 'aaaaaaa5-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    { vehicle_id: 'bbbbbbb6-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-06-KL-2345', vehicle_type: 'Hatchback (Hyundai i20)', capacity: 4, driver_id: 'aaaaaaa6-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    { vehicle_id: 'bbbbbbb7-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-08-MN-6789', vehicle_type: 'XL MUV (Maruti Ertiga)', capacity: 7, driver_id: 'aaaaaaa7-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    { vehicle_id: 'bbbbbbb8-bbbb-bbbb-bbbb-bbbbbbbbbbbb', vehicle_number: 'KA-09-OP-0123', vehicle_type: 'Sedan (Maruti Dzire)', capacity: 4, driver_id: 'aaaaaaa8-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }
   ] as Vehicle[],
 
   locations: Object.entries(LOCATIONS_DATA).map(([name, coords]) => ({
@@ -237,7 +253,16 @@ export async function deleteUser(userId: string, cascade: boolean = true): Promi
 export async function getDrivers(): Promise<Driver[]> {
   if (isSupabaseConfigured()) {
     const { data, error } = await supabase.from('drivers').select('*');
-    if (!error && data) return data;
+    if (!error && data && data.length > 0) {
+      // Merge memoryStore drivers to guarantee full expanded fleet is always accessible
+      const merged = [...data];
+      for (const d of memoryStore.drivers) {
+        if (!merged.some(m => m.driver_id === d.driver_id || m.driver_name === d.driver_name)) {
+          merged.push(d);
+        }
+      }
+      return merged;
+    }
   }
   return memoryStore.drivers;
 }
@@ -273,7 +298,16 @@ export async function createDriver(driverData: {
 export async function getVehicles(): Promise<Vehicle[]> {
   if (isSupabaseConfigured()) {
     const { data, error } = await supabase.from('vehicles').select('*');
-    if (!error && data) return data;
+    if (!error && data && data.length > 0) {
+      // Merge memoryStore vehicles so all vehicle types/capacities are available
+      const merged = [...data];
+      for (const v of memoryStore.vehicles) {
+        if (!merged.some(m => m.vehicle_id === v.vehicle_id || m.driver_id === v.driver_id)) {
+          merged.push(v);
+        }
+      }
+      return merged;
+    }
   }
   return memoryStore.vehicles;
 }
@@ -317,22 +351,40 @@ export async function createVehicle(vehicleData: Omit<Vehicle, 'vehicle_id'>): P
 // Rides & Multi-User Pooling
 // ==========================================
 export async function getRides(filters?: { user_id?: string; driver_id?: string }): Promise<Ride[]> {
+  let result: Ride[] = [];
   if (isSupabaseConfigured()) {
     let query = supabase.from('rides').select('*');
     if (filters?.user_id) query = query.eq('user_id', filters.user_id);
     if (filters?.driver_id) query = query.eq('driver_id', filters.driver_id);
     const { data, error } = await query.order('ride_date', { ascending: false });
-    if (!error && data) return data;
+    if (!error && data) result = data;
+    else result = [...memoryStore.rides];
+  } else {
+    result = [...memoryStore.rides];
   }
 
-  let result = [...memoryStore.rides];
   if (filters?.user_id) {
     result = result.filter(r => r.user_id === filters.user_id);
   }
   if (filters?.driver_id) {
     result = result.filter(r => r.driver_id === filters.driver_id);
   }
-  return result;
+
+  // Overlay rideDynamicCache onto each ride
+  return result.map(r => {
+    const cached = rideDynamicCache.get(r.ride_id);
+    if (!cached) return r;
+    return {
+      ...r,
+      ride_status: cached.status || r.ride_status || 'driver_assigned',
+      ride_type: cached.ride_type || r.ride_type || 'solo',
+      passengers_count: cached.passengers_count || r.passengers_count || 1,
+      departure_time: cached.departure_time || r.departure_time || '20:30',
+      is_scheduled: cached.is_scheduled !== undefined ? cached.is_scheduled : r.is_scheduled,
+      pool_ride_id: cached.pool_ride_id || r.pool_ride_id,
+      co_riders: cached.co_riders || []
+    };
+  });
 }
 
 export async function getRideById(id: string): Promise<{
@@ -352,10 +404,18 @@ export async function getRideById(id: string): Promise<{
       supabase.from('users').select('*').eq('user_id', ride.user_id).maybeSingle()
     ]);
 
+    let driver = driverRes.data;
+    if (!driver && ride.driver_id) {
+      driver = memoryStore.drivers.find(d => d.driver_id === ride.driver_id) || null;
+    }
+
     let vehicle = null;
     if (ride.driver_id) {
       const vRes = await supabase.from('vehicles').select('*').eq('driver_id', ride.driver_id).maybeSingle();
       vehicle = vRes.data;
+      if (!vehicle) {
+        vehicle = memoryStore.vehicles.find(v => v.driver_id === ride.driver_id) || null;
+      }
     }
 
     const cached = rideDynamicCache.get(id);
@@ -363,9 +423,7 @@ export async function getRideById(id: string): Promise<{
     const finalType = cached?.ride_type || ride.ride_type || 'solo';
     const finalPassengers = cached?.passengers_count || ride.passengers_count || 1;
     const finalDeparture = cached?.departure_time || '20:30';
-    const finalCoRiders = cached?.co_riders || (finalType === 'shared' ? [
-      { id: 'co-1', name: 'Aarav Patel', pickup: ride.pickup_location, dropoff: ride.dropoff_location, seats: 1 }
-    ] : []);
+    const finalCoRiders = cached?.co_riders || [];
     const finalRefund = cached?.refund_amount !== undefined ? cached.refund_amount : (paymentRes.data?.refund_amount || 0);
 
     return {
@@ -380,7 +438,7 @@ export async function getRideById(id: string): Promise<{
         co_riders: finalCoRiders
       },
       payment: paymentRes.data ? { ...paymentRes.data, refund_amount: finalRefund } : undefined,
-      driver: driverRes.data || undefined,
+      driver: driver || undefined,
       vehicle: vehicle || undefined,
       user: userRes.data || undefined
     };
@@ -394,9 +452,7 @@ export async function getRideById(id: string): Promise<{
   const finalType = cached?.ride_type || ride.ride_type || 'solo';
   const finalPassengers = cached?.passengers_count || ride.passengers_count || 1;
   const finalDeparture = cached?.departure_time || '20:30';
-  const finalCoRiders = cached?.co_riders || (finalType === 'shared' ? [
-    { id: 'co-1', name: 'Aarav Patel', pickup: ride.pickup_location, dropoff: ride.dropoff_location, seats: 1 }
-  ] : []);
+  const finalCoRiders = cached?.co_riders || [];
 
   const payment = memoryStore.payments.find(p => p.ride_id === id);
   const finalRefund = cached?.refund_amount !== undefined ? cached.refund_amount : (payment?.refund_amount || 0);
@@ -436,6 +492,8 @@ export async function bookRide(params: {
   passengers_count?: number;
   is_scheduled?: boolean;
   departure_time?: string;
+  vehicle_type_preference?: string;
+  seating_capacity_preference?: number;
 }): Promise<{ ride: Ride; payment: Payment }> {
   if (params.pickup_location === params.dropoff_location) {
     throw new Error("Pickup and dropoff can't be the same.");
@@ -453,21 +511,86 @@ export async function bookRide(params: {
 
   const vehicles = await getVehicles();
 
-  // Pick an available driver whose vehicle can hold the requested seats
-  let assignedDriver = drivers[0];
-  let assignedVehicle: Vehicle | undefined = undefined;
+  // 1. Calculate active trip load for each driver to prevent overloading the same driver
+  const allRides = await getRides();
+  const activeStatusSet = new Set(['driver_assigned', 'driver_arrived', 'in_transit']);
+  const driverActiveCount = new Map<string, number>();
 
-  for (const drv of drivers) {
-    const v = vehicles.find(veh => veh.driver_id === drv.driver_id);
-    const capacity = v?.capacity || 4;
-    if (capacity >= passengers) {
-      assignedDriver = drv;
-      assignedVehicle = v;
-      break;
+  for (const r of allRides) {
+    const cached = rideDynamicCache.get(r.ride_id);
+    const st = cached?.status || r.ride_status;
+    if (r.driver_id && st && activeStatusSet.has(st)) {
+      driverActiveCount.set(r.driver_id, (driverActiveCount.get(r.driver_id) || 0) + 1);
     }
   }
 
-  // Capacity check
+  // 2. Map drivers with their assigned vehicle and active load
+  const driverCandidates = drivers.map(drv => {
+    const v = vehicles.find(veh => veh.driver_id === drv.driver_id);
+    const capacity = v?.capacity || 4;
+    const vType = v?.vehicle_type || 'Sedan';
+    const activeTrips = driverActiveCount.get(drv.driver_id) || 0;
+    return {
+      driver: drv,
+      vehicle: v,
+      capacity,
+      vType,
+      activeTrips,
+      rating: drv.ratings !== undefined && drv.ratings !== null ? Number(drv.ratings) : 5.0
+    };
+  });
+
+  // Filter: Must be able to fit the requested passenger party
+  const capableCandidates = driverCandidates.filter(c => c.capacity >= passengers);
+  if (capableCandidates.length === 0) {
+    throw new Error(`Requested passengers (${passengers}) exceeds maximum capacity of any available vehicle.`);
+  }
+
+  const prefType = params.vehicle_type_preference && params.vehicle_type_preference !== 'any'
+    ? params.vehicle_type_preference.toLowerCase()
+    : null;
+  const prefCapacity = params.seating_capacity_preference && params.seating_capacity_preference > 0
+    ? Number(params.seating_capacity_preference)
+    : null;
+
+  // Score candidate suitability based on user selection:
+  // - Type match: +100 bonus
+  // - Exact capacity match: +50 bonus (or capacity >= preferred: +20)
+  // - Active load penalty: -35 per active trip (idle drivers prioritized heavily!)
+  // - Rating factor: + rating * 2
+  const scoredCandidates = capableCandidates.map(c => {
+    let score = 0;
+    const typeMatches = prefType ? c.vType.toLowerCase().includes(prefType) : false;
+    if (prefType) {
+      if (typeMatches) score += 100;
+      else score -= 40;
+    }
+
+    if (prefCapacity) {
+      if (c.capacity === prefCapacity) score += 50;
+      else if (c.capacity >= prefCapacity) score += 20;
+      else score -= 30;
+    }
+
+    // Prioritize idle drivers with 0 active trips!
+    score -= (c.activeTrips * 35);
+    score += (c.rating * 2);
+
+    return { ...c, score, typeMatches };
+  });
+
+  // Sort highest score first, then least active trips, then tightest capacity fit
+  scoredCandidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.activeTrips !== b.activeTrips) return a.activeTrips - b.activeTrips;
+    return (a.capacity - passengers) - (b.capacity - passengers);
+  });
+
+  const selectedCandidate = scoredCandidates[0];
+  const assignedDriver = selectedCandidate.driver;
+  const assignedVehicle = selectedCandidate.vehicle;
+
+  // Capacity check against assigned vehicle
   const vehicleCapacity = assignedVehicle?.capacity || 4;
   if (passengers > vehicleCapacity) {
     throw new Error(`Requested passengers (${passengers}) exceeds vehicle capacity (${vehicleCapacity} seats).`);
@@ -490,7 +613,11 @@ export async function bookRide(params: {
     passengers_count: passengers,
     departure_time: departureTime,
     is_scheduled: isScheduled,
-    co_riders: []
+    co_riders: [],
+    vehicle_type_preference: params.vehicle_type_preference,
+    seating_capacity_preference: params.seating_capacity_preference,
+    assigned_vehicle_type: assignedVehicle?.vehicle_type || undefined,
+    assigned_capacity: vehicleCapacity
   });
 
   if (isSupabaseConfigured()) {
@@ -553,6 +680,15 @@ export async function bookRide(params: {
       co_riders: []
     };
 
+    // Auto-dispatch invites to eligible corridor riders if opted for shared ride
+    if (rideType === 'shared') {
+      try {
+        await autoDispatchPoolInvites(rideId);
+      } catch (e) {
+        console.error('Auto-dispatch error in Supabase mode:', e);
+      }
+    }
+
     return { ride: fullRide, payment: paymentData };
   }
 
@@ -583,6 +719,15 @@ export async function bookRide(params: {
 
   memoryStore.rides.unshift(newRide);
   memoryStore.payments.unshift(newPayment);
+
+  // Auto-dispatch invites to eligible corridor riders if opted for shared ride
+  if (rideType === 'shared') {
+    try {
+      await autoDispatchPoolInvites(rideId);
+    } catch (e) {
+      console.error('Auto-dispatch error in memory mode:', e);
+    }
+  }
 
   return { ride: newRide, payment: newPayment };
 }
@@ -707,6 +852,13 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
   const currentRide = currentDetail.ride;
   const currentPickup = currentRide.pickup_location;
   const currentDropoff = currentRide.dropoff_location;
+  const currentCoRiders = currentRide.co_riders || [];
+  const vehicleCapacity = currentDetail.vehicle?.capacity || 4;
+
+  // If vehicle is already at max capacity, no more matches allowed
+  if (1 + currentCoRiders.length >= vehicleCapacity) {
+    return [];
+  }
 
   // Retrieve all rides
   let allRides: Ride[] = [];
@@ -734,6 +886,42 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
       continue;
     }
 
+    const rider = users.find(u => u.user_id === candidate.user_id);
+    const riderName = rider ? rider.name : 'Verified Rider';
+    const riderNumber = rider?.number || null;
+
+    // Filter out riders who have ALREADY accepted or joined this vehicle pool!
+    const isAlreadyCoRider = currentCoRiders.some(
+      c => c.name === riderName || c.id.includes(candidate.user_id.slice(0, 8))
+    );
+    const hasAcceptedInvite = poolInvitesStore.some(
+      inv =>
+        inv.status === 'accepted' &&
+        ((inv.sender_ride_id === rideId && inv.receiver_ride_id === candidate.ride_id) ||
+         (inv.sender_ride_id === candidate.ride_id && inv.receiver_ride_id === rideId) ||
+         (inv.sender_user_id === currentRide.user_id && inv.receiver_user_id === candidate.user_id) ||
+         (inv.sender_user_id === candidate.user_id && inv.receiver_user_id === currentRide.user_id))
+    );
+
+    if (isAlreadyCoRider || hasAcceptedInvite) {
+      continue;
+    }
+
+    // Match Date: must be scheduled for the same calendar date
+    const candDate = candidate.ride_date || new Date().toISOString().split('T')[0];
+    const currDate = currentRide.ride_date || new Date().toISOString().split('T')[0];
+    if (candDate !== currDate) {
+      continue;
+    }
+
+    // Match Departure Time: allowable deviation window <= 45 minutes
+    const candTime = cached?.departure_time || candidate.departure_time || '20:30';
+    const currTime = currentRide.departure_time || '20:30';
+    const timeMatch = isDateTimeCompatible(currDate, currTime, candDate, candTime, 45);
+    if (!timeMatch.isMatch) {
+      continue;
+    }
+
     // Check corridor geometry: does candidate route fall along or midway on current route?
     const match = isLocationOnRoute(
       currentPickup,
@@ -743,10 +931,6 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
     );
 
     if (match.isMatch) {
-      const rider = users.find(u => u.user_id === candidate.user_id);
-      const riderName = rider ? rider.name : 'Verified Rider';
-      const riderNumber = rider?.number || null;
-
       // Base fare calculation for potential pooling
       const { fare: standardFare } = calculateFareForLocations(currentPickup, currentDropoff);
       const totalRiders = 2; // Joining together
@@ -767,7 +951,7 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
         pickup_location: candidate.pickup_location,
         dropoff_location: candidate.dropoff_location,
         ride_date: candidate.ride_date,
-        departure_time: cached?.departure_time || '20:30',
+        departure_time: candTime,
         ride_status: candidateStatus,
         passengers_count: cached?.passengers_count || candidate.passengers_count || 1,
         match_type: match.matchType,
@@ -785,6 +969,57 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
   }
 
   return matchedList;
+}
+
+/**
+ * Automatically dispatches pool invitations to all eligible corridor riders.
+ * Runs in the background whenever a user opts for a shared ride.
+ * Dispatches to all eligible corridor riders (irrespective of whether they booked solo or shared).
+ */
+export async function autoDispatchPoolInvites(rideId: string): Promise<PoolInvite[]> {
+  const currentDetail = await getRideById(rideId);
+  if (!currentDetail) return [];
+
+  const currentRide = currentDetail.ride;
+  const currentCoRiders = currentRide.co_riders || [];
+  const vehicleCapacity = currentDetail.vehicle?.capacity || 4;
+
+  if (1 + currentCoRiders.length >= vehicleCapacity) {
+    return [];
+  }
+
+  const matches = await getMatchingBookedRides(rideId);
+  const newlyDispatched: PoolInvite[] = [];
+
+  for (const candidate of matches) {
+    const existing = poolInvitesStore.find(
+      inv =>
+        (inv.sender_ride_id === rideId && inv.receiver_ride_id === candidate.ride_id) ||
+        (inv.sender_ride_id === candidate.ride_id && inv.receiver_ride_id === rideId) ||
+        (inv.sender_user_id === currentRide.user_id && inv.receiver_user_id === candidate.user_id) ||
+        (inv.sender_user_id === candidate.user_id && inv.receiver_user_id === currentRide.user_id)
+    );
+
+    if (!existing) {
+      const newInvite: PoolInvite = {
+        invite_id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        sender_ride_id: rideId,
+        receiver_ride_id: candidate.ride_id,
+        sender_user_id: currentRide.user_id,
+        sender_name: currentDetail.user?.name || 'Rider',
+        receiver_user_id: candidate.user_id,
+        receiver_name: candidate.rider_name,
+        sender_pickup: currentRide.pickup_location,
+        sender_dropoff: currentRide.dropoff_location,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      poolInvitesStore.push(newInvite);
+      newlyDispatched.push(newInvite);
+    }
+  }
+
+  return newlyDispatched;
 }
 
 /**
@@ -827,17 +1062,21 @@ export async function sendOrAcceptPoolInvite(
         sender_name: rideA.user?.name || 'Rider A',
         receiver_user_id: rideB.ride.user_id,
         receiver_name: rideB.user?.name || 'Rider B',
+        sender_pickup: rideA.ride.pickup_location,
+        sender_dropoff: rideA.ride.dropoff_location,
         status: 'pending',
         created_at: new Date().toISOString()
       };
       poolInvitesStore.push(invite);
     } else {
       invite.status = 'pending';
+      invite.sender_pickup = rideA.ride.pickup_location;
+      invite.sender_dropoff = rideA.ride.dropoff_location;
     }
 
     return {
       success: true,
-      message: `Ride pooling invite sent to ${rideB.user?.name || 'co-rider'}. Awaiting response.`,
+      message: 'Ride pooling invite sent for this route. Awaiting response.',
       invite
     };
   }
@@ -852,6 +1091,17 @@ export async function sendOrAcceptPoolInvite(
   }
 
   if (action === 'accept') {
+    // Capacity Check: Enforce first-come, first-served vehicle capacity
+    const vehicleCapacity = rideA.vehicle?.capacity || 4;
+    const currentCoRidersA = rideA.ride.co_riders || [];
+    const currentOccupiedSeats = 1 + currentCoRidersA.reduce((sum, c) => sum + (c.seats || 1), 0);
+    const newIncomingSeats = rideB.ride.passengers_count || 1;
+
+    if (currentOccupiedSeats + newIncomingSeats > vehicleCapacity) {
+      if (invite) invite.status = 'declined';
+      throw new Error(`Vehicle seating capacity reached (${vehicleCapacity} seats max). This ride pool is now full on a first-come, first-served basis.`);
+    }
+
     if (invite) {
       invite.status = 'accepted';
     } else {
@@ -871,14 +1121,15 @@ export async function sendOrAcceptPoolInvite(
 
     // Both rides are pooled together!
     const poolId = `pool-${senderRideId.slice(0, 8)}-${targetRideId.slice(0, 8)}`;
+    const totalRidersInPool = currentOccupiedSeats + newIncomingSeats;
 
     // Standard base fare for Ride A and Ride B
     const { fare: standardFareA } = calculateFareForLocations(rideA.ride.pickup_location, rideA.ride.dropoff_location);
     const { fare: standardFareB } = calculateFareForLocations(rideB.ride.pickup_location, rideB.ride.dropoff_location);
 
-    // 30% pooling discount applied to each rider's route!
-    const { finalFare: pooledFareA } = calculateDynamicFare(standardFareA, 'shared', 2);
-    const { finalFare: pooledFareB } = calculateDynamicFare(standardFareB, 'shared', 2);
+    // Dynamic pooling discount applied to each rider's route!
+    const { finalFare: pooledFareA } = calculateDynamicFare(standardFareA, 'shared', totalRidersInPool);
+    const { finalFare: pooledFareB } = calculateDynamicFare(standardFareB, 'shared', totalRidersInPool);
 
     // Prepare CoRider objects
     const coRiderForA: CoRider = {
@@ -915,15 +1166,15 @@ export async function sendOrAcceptPoolInvite(
 
     // Update Cache for Ride A
     const cachedA = rideDynamicCache.get(senderRideId);
-    const currentCoRidersA = cachedA?.co_riders || rideA.ride.co_riders || [];
-    const updatedCoRidersA = currentCoRidersA.some(c => c.name === coRiderForA.name)
-      ? currentCoRidersA
-      : [...currentCoRidersA, coRiderForA];
+    const currentCoRidersListA = cachedA?.co_riders || rideA.ride.co_riders || [];
+    const updatedCoRidersA = currentCoRidersListA.some(c => c.name === coRiderForA.name)
+      ? currentCoRidersListA
+      : [...currentCoRidersListA, coRiderForA];
 
     rideDynamicCache.set(senderRideId, {
       status: cachedA?.status || rideA.ride.ride_status || 'driver_assigned',
       ride_type: 'shared',
-      passengers_count: 2,
+      passengers_count: totalRidersInPool,
       departure_time: cachedA?.departure_time || rideA.ride.departure_time || '20:30',
       pool_ride_id: poolId,
       refund_amount: (cachedA?.refund_amount || rideA.payment?.refund_amount || 0) + refundA,
@@ -932,15 +1183,29 @@ export async function sendOrAcceptPoolInvite(
 
     // Update Cache for Ride B
     const cachedB = rideDynamicCache.get(targetRideId);
-    const currentCoRidersB = cachedB?.co_riders || rideB.ride.co_riders || [];
-    const updatedCoRidersB = currentCoRidersB.some(c => c.name === coRiderForB.name)
-      ? currentCoRidersB
-      : [...currentCoRidersB, coRiderForB];
+    const currentCoRidersListB = cachedB?.co_riders || rideB.ride.co_riders || [];
+    const updatedCoRidersB = currentCoRidersListB.some(c => c.name === coRiderForB.name)
+      ? currentCoRidersListB
+      : [...currentCoRidersListB, coRiderForB];
+
+    // If vehicle capacity reached, expire other remaining pending invites for this ride
+    if (totalRidersInPool >= vehicleCapacity) {
+      poolInvitesStore.forEach(inv => {
+        if (
+          inv.status === 'pending' &&
+          (inv.sender_ride_id === senderRideId || inv.receiver_ride_id === senderRideId ||
+           inv.sender_ride_id === targetRideId || inv.receiver_ride_id === targetRideId) &&
+          (!invite || inv.invite_id !== invite.invite_id)
+        ) {
+          inv.status = 'declined';
+        }
+      });
+    }
 
     rideDynamicCache.set(targetRideId, {
       status: cachedB?.status || rideB.ride.ride_status || 'driver_assigned',
       ride_type: 'shared',
-      passengers_count: 2,
+      passengers_count: totalRidersInPool,
       departure_time: cachedB?.departure_time || rideB.ride.departure_time || '20:30',
       pool_ride_id: poolId,
       refund_amount: (cachedB?.refund_amount || rideB.payment?.refund_amount || 0) + refundB,
@@ -992,7 +1257,7 @@ export async function sendOrAcceptPoolInvite(
 
     return {
       success: true,
-      message: `Pooling confirmed! Ride shared with ${rideB.user?.name || 'co-rider'}. Fare reduced to ₹${pooledFareA}.${refundMsg}`,
+      message: `Pooling confirmed! Ride shared on this route. Fare reduced to ₹${pooledFareA}.${refundMsg}`,
       invite,
       refundProcessedA: refundA,
       refundProcessedB: refundB,
@@ -1002,6 +1267,15 @@ export async function sendOrAcceptPoolInvite(
   }
 
   throw new Error('Invalid invite action');
+}
+
+/**
+ * Returns all pool invites where the user is either the recipient or sender.
+ */
+export async function getInvitesForUser(userId: string): Promise<PoolInvite[]> {
+  return poolInvitesStore.filter(
+    inv => inv.receiver_user_id === userId || inv.sender_user_id === userId
+  );
 }
 
 /**
@@ -1096,6 +1370,14 @@ export async function updateRide(
       .select()
       .single();
 
+    if (rideType === 'shared') {
+      try {
+        await autoDispatchPoolInvites(rideId);
+      } catch (e) {
+        console.error('Auto-dispatch error in Supabase updateRide:', e);
+      }
+    }
+
     return {
       ride: {
         ...updatedRide,
@@ -1133,6 +1415,14 @@ export async function updateRide(
     }
   }
 
+  if (rideType === 'shared') {
+    try {
+      await autoDispatchPoolInvites(rideId);
+    } catch (e) {
+      console.error('Auto-dispatch error in memory updateRide:', e);
+    }
+  }
+
   return {
     ride: {
       ...memoryStore.rides[rideIndex],
@@ -1159,9 +1449,75 @@ export async function deleteRide(rideId: string): Promise<boolean> {
     throw new Error("This ride can't be cancelled after the rider has boarded the cab.");
   }
 
+  const cancellingUserId = rideDetail.ride.user_id;
+  const cancellingUserName = rideDetail.user?.name || '';
+  const cancellingRideId = rideId;
+
+  // 1. CANCELLATION ISOLATION:
+  // If this ride is part of a shared pool, remove the cancelling rider from other active rides' co-riders,
+  // but DO NOT cancel the trip for the remaining co-riders!
+  try {
+    const allRides = await getRides();
+    for (const otherRide of allRides) {
+      if (otherRide.ride_id === cancellingRideId) continue;
+
+      const cached = rideDynamicCache.get(otherRide.ride_id);
+      const existingCoRiders = cached?.co_riders || otherRide.co_riders || [];
+
+      const hasCancellingUser = existingCoRiders.some(
+        c => c.name === cancellingUserName || c.id.includes(cancellingUserId.slice(0, 8))
+      );
+
+      if (hasCancellingUser) {
+        // Remove the cancelling user; keep other user's ride completely active!
+        const remainingCoRiders = existingCoRiders.filter(
+          c => c.name !== cancellingUserName && !c.id.includes(cancellingUserId.slice(0, 8))
+        );
+
+        const newPassengerCount = Math.max(1, remainingCoRiders.length + 1);
+
+        rideDynamicCache.set(otherRide.ride_id, {
+          status: cached?.status || otherRide.ride_status || 'driver_assigned',
+          ride_type: otherRide.ride_type || 'shared',
+          passengers_count: newPassengerCount,
+          departure_time: cached?.departure_time || otherRide.departure_time || '20:30',
+          is_scheduled: cached?.is_scheduled !== undefined ? cached.is_scheduled : otherRide.is_scheduled,
+          pool_ride_id: remainingCoRiders.length > 0 ? cached?.pool_ride_id : undefined,
+          refund_amount: cached?.refund_amount,
+          co_riders: remainingCoRiders
+        });
+
+        // Sync memory store if present
+        const mIdx = memoryStore.rides.findIndex(r => r.ride_id === otherRide.ride_id);
+        if (mIdx !== -1) {
+          memoryStore.rides[mIdx].passengers_count = newPassengerCount;
+        }
+
+        // Auto-trigger new match search for the remaining rider since a seat opened up
+        if (remainingCoRiders.length === 0) {
+          autoDispatchPoolInvites(otherRide.ride_id).catch(() => {});
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error updating co-riders during cancellation isolation:', err);
+  }
+
+  // 2. Clean up any invites associated with this cancelled ride
+  poolInvitesStore.forEach(inv => {
+    if (inv.sender_ride_id === cancellingRideId || inv.receiver_ride_id === cancellingRideId) {
+      inv.status = 'declined';
+    }
+  });
+
+  // 3. Delete this ride's dynamic cache
   rideDynamicCache.delete(rideId);
 
+  // 4. Delete payments and ride from Supabase or memory store
   if (isSupabaseConfigured()) {
+    try {
+      await supabase.from('payments').delete().eq('ride_id', rideId);
+    } catch {}
     const { error } = await supabase.from('rides').delete().eq('ride_id', rideId);
     if (error) throw new Error(error.message);
     return true;

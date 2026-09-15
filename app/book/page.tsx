@@ -30,9 +30,28 @@ export default function BookRidePage() {
   const [bookingTiming, setBookingTiming] = useState<'now' | 'later'>('now');
   const [scheduledTime, setScheduledTime] = useState('20:30');
   const [rideType, setRideType] = useState<'solo' | 'shared'>('shared');
+  const [vehiclePreference, setVehiclePreference] = useState<'any' | 'Hatchback' | 'Sedan' | 'SUV' | 'XL MUV'>('any');
+  const [capacityPreference, setCapacityPreference] = useState<number>(0);
   const [passengersCount, setPassengersCount] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const getSelectedVehicleMaxCapacity = () => {
+    if (capacityPreference > 0) return capacityPreference;
+    if (vehiclePreference === 'XL MUV') return 7;
+    if (vehiclePreference === 'SUV') return 6;
+    if (vehiclePreference === 'Sedan' || vehiclePreference === 'Hatchback') return 4;
+    return 4;
+  };
+
+  const handleSelectVehicle = (type: 'any' | 'Hatchback' | 'Sedan' | 'SUV' | 'XL MUV', cap: number) => {
+    setVehiclePreference(type);
+    setCapacityPreference(cap);
+    const maxCap = cap > 0 ? cap : (type === 'XL MUV' ? 7 : type === 'SUV' ? 6 : 4);
+    if (passengersCount > maxCap) {
+      setPassengersCount(maxCap);
+    }
+  };
 
   useEffect(() => {
     async function fetchLocations() {
@@ -77,8 +96,9 @@ export default function BookRidePage() {
       return;
     }
 
-    if (passengersCount > 6) {
-      showToast('Maximum vehicle capacity is 6 passengers.', 'error');
+    const maxCapacity = getSelectedVehicleMaxCapacity();
+    if (passengersCount > maxCapacity) {
+      showToast(`Selected vehicle capacity is ${maxCapacity} passengers max.`, 'error');
       return;
     }
 
@@ -112,7 +132,9 @@ export default function BookRidePage() {
           ride_type: rideType,
           passengers_count: passengersCount,
           is_scheduled: bookingTiming === 'later',
-          departure_time: departureTime
+          departure_time: departureTime,
+          vehicle_type_preference: vehiclePreference !== 'any' ? vehiclePreference : undefined,
+          seating_capacity_preference: capacityPreference > 0 ? capacityPreference : undefined
         })
       });
 
@@ -250,22 +272,115 @@ export default function BookRidePage() {
             </div>
           </div>
 
-          {/* Seats Needed (Capacity Constraint) */}
-          {rideType === 'shared' && (
-            <div className="p-3 bg-emerald-950/20 border border-emerald-900/30 rounded-xl flex items-center justify-between">
+          {/* Vehicle Category & Car Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Select Vehicle Category
+              </label>
+              <span className="text-[11px] text-blue-400 font-medium">Smart Load-Balanced Driver Assignment</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {[
+                { id: 'any', name: 'Any Cab', badge: 'Fastest Match', models: 'Auto-assigns idle driver', cap: 0, capText: '4-7 Seats' },
+                { id: 'Hatchback', name: 'Hatchback', badge: 'Swift / i20', models: 'Budget friendly city ride', cap: 4, capText: '4 Seats' },
+                { id: 'Sedan', name: 'Sedan', badge: 'City / Etios', models: 'Smooth ride & spacious trunk', cap: 4, capText: '4 Seats' },
+                { id: 'SUV', name: 'SUV', badge: 'Creta / Innova', models: 'High clearance & 6 seats', cap: 6, capText: '6 Seats' },
+                { id: 'XL MUV', name: 'XL MUV', badge: 'Maruti Ertiga', models: 'Spacious 7 seater capacity', cap: 7, capText: '7 Seats' },
+              ].map((veh) => {
+                const isSelected = vehiclePreference === veh.id;
+                return (
+                  <button
+                    key={veh.id}
+                    type="button"
+                    onClick={() => handleSelectVehicle(veh.id as any, veh.cap)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      isSelected
+                        ? 'bg-blue-600/25 border-blue-500 text-white shadow-lg shadow-blue-600/20 scale-[1.02]'
+                        : 'bg-slate-950/60 border-slate-800/80 text-slate-300 hover:border-slate-700 hover:bg-slate-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-xs font-bold flex items-center gap-1">
+                        <Car className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-400' : 'text-slate-400'}`} />
+                        {veh.name}
+                      </span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-500/30 text-blue-200' : 'bg-slate-800 text-slate-400'}`}>
+                        {veh.capText}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-slate-400 truncate">{veh.badge}</div>
+                    <div className="text-[10px] text-slate-500 truncate mt-0.5">{veh.models}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Seating Capacity Filter */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              Seating Capacity Preference
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { cap: 0, label: 'Any Capacity' },
+                { cap: 4, label: '4 Seats (Hatchback / Sedan)' },
+                { cap: 6, label: '6 Seats (SUV)' },
+                { cap: 7, label: '7 Seats (XL MUV)' },
+              ].map((opt) => (
+                <button
+                  key={opt.cap}
+                  type="button"
+                  onClick={() => {
+                    setCapacityPreference(opt.cap);
+                    if (opt.cap === 4 && (vehiclePreference === 'SUV' || vehiclePreference === 'XL MUV')) {
+                      setVehiclePreference('Sedan');
+                    } else if (opt.cap === 6 && vehiclePreference !== 'SUV') {
+                      setVehiclePreference('SUV');
+                    } else if (opt.cap === 7 && vehiclePreference !== 'XL MUV') {
+                      setVehiclePreference('XL MUV');
+                    }
+                    const maxCap = opt.cap > 0 ? opt.cap : getSelectedVehicleMaxCapacity();
+                    if (passengersCount > maxCap) setPassengersCount(maxCap);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                    capacityPreference === opt.cap
+                      ? 'bg-blue-500/20 border-blue-500 text-blue-300 shadow-sm'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Passenger Count / Seats Needed */}
+          <div className="p-3.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs font-semibold text-emerald-200 block">Seats Needed</span>
-                <span className="text-[10px] text-emerald-400/80">Vehicle capacity constraint enforced</span>
+                <span className="text-xs font-bold text-white block">
+                  {rideType === 'shared' ? 'Seats Needed For Your Party' : 'Passengers Count'}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {rideType === 'shared'
+                    ? `Max vehicle capacity: ${getSelectedVehicleMaxCapacity()} passengers`
+                    : `Party size (Max: ${getSelectedVehicleMaxCapacity()})`}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4].map((num) => (
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: getSelectedVehicleMaxCapacity() }, (_, i) => i + 1).map((num) => (
                   <button
                     key={num}
                     type="button"
                     onClick={() => setPassengersCount(num)}
                     className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                       passengersCount === num
-                        ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                        ? rideType === 'shared'
+                          ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                          : 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
@@ -274,7 +389,24 @@ export default function BookRidePage() {
                 ))}
               </div>
             </div>
-          )}
+
+            {/* Explanatory banner for Shared vs Solo */}
+            {rideType === 'shared' ? (
+              <div className="pt-2 border-t border-slate-800/60 text-[11px] text-emerald-300/90 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>
+                  <strong>Shared Ride Active:</strong> Your {vehiclePreference === 'any' ? 'assigned vehicle' : vehiclePreference} has {getSelectedVehicleMaxCapacity()} total seats. You reserve <strong>{passengersCount} seat(s)</strong>; up to <strong>{getSelectedVehicleMaxCapacity() - passengersCount} co-riders</strong> along your corridor can join on a first-come, first-served basis.
+                </span>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-800/60 text-[11px] text-blue-300/90 flex items-center gap-2">
+                <Car className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>
+                  <strong>Private Solo Cab:</strong> The entire {getSelectedVehicleMaxCapacity()}-seater {vehiclePreference === 'any' ? 'vehicle' : vehiclePreference} is reserved exclusively for your party.
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* Pickup Selection */}
           <div>

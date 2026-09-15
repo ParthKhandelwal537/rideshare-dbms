@@ -20,7 +20,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { user_id, pickup_location, dropoff_location, ride_date, ride_type, passengers_count, is_scheduled, departure_time } = body;
+    const {
+      user_id,
+      pickup_location,
+      dropoff_location,
+      ride_date,
+      ride_type,
+      passengers_count,
+      is_scheduled,
+      departure_time,
+      vehicle_type_preference,
+      seating_capacity_preference
+    } = body;
 
     if (!user_id || !pickup_location || !dropoff_location) {
       return NextResponse.json(
@@ -44,7 +55,9 @@ export async function POST(request: NextRequest) {
       ride_type: ride_type || 'solo',
       passengers_count: passengers_count ? parseInt(passengers_count, 10) : 1,
       is_scheduled: !!is_scheduled,
-      departure_time
+      departure_time,
+      vehicle_type_preference: vehicle_type_preference || undefined,
+      seating_capacity_preference: seating_capacity_preference ? parseInt(seating_capacity_preference, 10) : undefined
     });
 
     const isShared = ride.ride_type === 'shared';
@@ -59,10 +72,11 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    console.error('ERROR IN POST /api/rides:', error);
     const isClientError =
-      error.message.includes('No drivers available') ||
-      error.message.includes("Pickup and dropoff can't be the same") ||
-      error.message.includes('exceeds vehicle capacity');
+      error.message?.includes('No drivers available') ||
+      error.message?.includes("Pickup and dropoff can't be the same") ||
+      error.message?.includes('exceeds vehicle capacity');
     return NextResponse.json(
       { success: false, message: error.message || 'Failed to book ride' },
       { status: isClientError ? 400 : 500 }

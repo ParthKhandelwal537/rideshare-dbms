@@ -32,7 +32,8 @@ import {
   UserMinus,
   Sparkles,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Radio
 } from 'lucide-react';
 
 export default function RideDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -182,11 +183,6 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
     }
     setSharingType(type);
     setFareConfirmedSuccess(false);
-    if (type === 'shared' && coRiders.length === 0) {
-      setCoRiders([
-        { id: 'corider-demo-1', name: 'Aarav Patel', pickup: ride?.pickup_location || 'MG Road', dropoff: ride?.dropoff_location || 'Indiranagar', seats: 1 }
-      ]);
-    }
   };
 
   // Add / Match next verified Co-Rider along route
@@ -202,31 +198,18 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
       return;
     }
 
-    const existingNames = new Set(coRiders.map(c => c.name));
-    const poolCandidates = [
-      { name: 'Sneha Rao', pickup: 'Koramangala', dropoff: 'Airport' },
-      { name: 'Aarav Patel', pickup: 'MG Road', dropoff: 'Indiranagar' },
-      { name: 'Pooja Hegde', pickup: 'Indiranagar', dropoff: 'Whitefield' },
-      { name: 'Rohan Roy', pickup: 'Electronic City', dropoff: 'Indiranagar' }
-    ];
-
-    const nextCandidate = poolCandidates.find(c => !existingNames.has(c.name)) || {
-      name: `Rider #${coRiders.length + 2}`,
-      pickup: ride?.pickup_location || 'MG Road',
-      dropoff: ride?.dropoff_location || 'Airport'
-    };
-
+    const coRiderIndex = coRiders.length + 1;
     const newCoRider: CoRider = {
       id: `corider-${Date.now()}`,
-      name: nextCandidate.name,
-      pickup: nextCandidate.pickup,
-      dropoff: nextCandidate.dropoff,
+      name: `Co-Rider #${coRiderIndex}`,
+      pickup: ride?.pickup_location || 'MG Road',
+      dropoff: ride?.dropoff_location || 'Airport',
       seats: 1
     };
 
     setCoRiders([...coRiders, newCoRider]);
     setFareConfirmedSuccess(false);
-    showToast(`Co-rider ${nextCandidate.name} joined! Dynamic fare reduced. Confirm before payment.`, 'info');
+    showToast('A co-rider on this route has joined! Dynamic fare reduced. Confirm before payment.', 'info');
   };
 
   // Remove Co-Rider from pool
@@ -751,33 +734,63 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
                 </span>
               </div>
 
-              {/* Co-Riders */}
-              {coRiders.map((co) => (
-                <div
-                  key={co.id}
-                  className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/60 flex items-center justify-between text-xs hover:border-indigo-800/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center font-semibold text-indigo-300 text-xs">
-                      {co.name.charAt(0)}
+              {/* Co-Riders / Matching in Progress Banner */}
+              {coRiders.length === 0 ? (
+                <div className="p-4 bg-gradient-to-r from-blue-950/60 via-indigo-950/50 to-slate-950 border border-indigo-500/50 rounded-xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center shrink-0">
+                      <Radio className="w-5 h-5 text-indigo-400 animate-pulse" />
                     </div>
-                    <div>
-                      <div className="font-semibold text-slate-200">{co.name} (Matched Co-Rider)</div>
-                      <div className="text-[11px] text-slate-500">{co.pickup} → {co.dropoff}</div>
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Matching in Progress</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+                          First-Come, First-Served ({vehicle?.capacity || 4} Seats Max)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        We are trying to match you with other people along your route. Automatic invites have been dispatched to eligible riders along your corridor. As soon as a co-rider accepts, this notification will clear and their profile will appear here!
+                      </p>
                     </div>
                   </div>
-                  {!isPaid && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCoRider(co.id)}
-                      className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
-                      title="Remove co-rider from pool"
-                    >
-                      <UserMinus className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-2">
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center gap-2 text-xs text-emerald-300 animate-in fade-in-50">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      <strong>Matched & Joined!</strong> Co-rider pool active ({1 + coRiders.length} of {vehicle?.capacity || 4} seats filled on first-come, first-served basis). 30% pooling discount applied.
+                    </span>
+                  </div>
+
+                  {coRiders.map((co) => (
+                    <div
+                      key={co.id}
+                      className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/60 flex items-center justify-between text-xs hover:border-indigo-800/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center font-semibold text-indigo-300 text-xs">
+                          <Users className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-200">Co-Rider on Route</div>
+                          <div className="text-[11px] text-slate-400">{co.pickup} &rarr; {co.dropoff}</div>
+                        </div>
+                      </div>
+                      {!isPaid && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCoRider(co.id)}
+                          className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                          title="Remove co-rider from pool"
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Dynamic Fare Calculation Table */}
@@ -835,14 +848,128 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         ) : (
           /* Solo Ride Selected */
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
-              <span className="font-semibold text-white block">Solo Cab Selected</span>
-              <span>Full vehicle reserved exclusively for 1 passenger. Standard route fare applies.</span>
+              <span className="font-semibold text-white block">Solo Cab Currently Booked</span>
+              <span>Full vehicle reserved exclusively for 1 passenger. Standard route fare applies. You can invite other solo riders on your route corridor below to pool together and save 30%!</span>
             </div>
             <span className="text-base font-bold text-white font-mono shrink-0">₹{baseSoloFare}</span>
           </div>
         )}
+
+        {/* LIVE CORRIDOR ROUTE MATCHING & INVITE SYSTEM (Visible for BOTH Solo and Shared Rides) */}
+        <div className="pt-4 border-t border-indigo-900/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-white">
+                Live Booked Riders on Your Route Corridor
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+                Geometry Match &le; 25% Detour
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchMatchedBookedRides}
+              disabled={loadingMatches}
+              className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingMatches ? 'animate-spin' : ''}`} />
+              <span>Scan Route</span>
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-400">
+            {sharingType === 'solo'
+              ? 'Even as a solo rider, you can invite or receive invites from any rider travelling along your route corridor. Once accepted, your ride automatically converts to a shared pool and your fare drops by 30% (with automatic refund if already paid)!'
+              : 'The app automatically sends invites to all eligible riders on your route corridor (both solo and shared) on a first-come, first-served basis up to vehicle capacity. When someone accepts, you are instantly paired and dynamic pooling discounts apply!'}
+          </div>
+
+          {matchedBookedRides.length === 0 ? (
+            <div className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs text-slate-400 text-center space-y-1">
+              <div className="font-semibold text-slate-300">No other booked rides on this exact corridor right now</div>
+              <div className="text-[11px] text-slate-500">
+                Matches only appear when another rider books along your path ({ride.pickup_location} &rarr; {ride.dropoff_location}) or midway on the corridor.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {matchedBookedRides.map((candidate) => (
+                <div
+                  key={candidate.ride_id}
+                  className="p-3.5 bg-slate-950/80 border border-indigo-900/40 hover:border-indigo-500/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-all"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm">Ride on this route</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">
+                        {candidate.pickup_location} &rarr; {candidate.dropoff_location}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">
+                        +{candidate.detour_km} km corridor
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3" />
+                      <span>{candidate.corridor_description}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Scheduled: {candidate.ride_date} at {candidate.departure_time} &bull; Pooled Fare: ₹{candidate.potential_pooled_fare} (Save 30%)
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    {candidate.invite_status === 'none' && (
+                      <button
+                        type="button"
+                        onClick={() => handleSendOrAcceptInvite(candidate.ride_id, 'send')}
+                        disabled={processingInviteId === candidate.ride_id}
+                        className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/30"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        {processingInviteId === candidate.ride_id ? 'Sending Invite...' : 'Send Pool Invite'}
+                      </button>
+                    )}
+
+                    {candidate.invite_status === 'pending' && (
+                      <div className="flex items-center gap-2">
+                        {candidate.is_sender ? (
+                          <span className="text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                            Invite Sent &bull; Awaiting Rider Response
+                          </span>
+                        ) : (
+                          <span className="text-[11px] px-2.5 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                            Ride on this route invited you to pool
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleSendOrAcceptInvite(candidate.ride_id, 'accept')}
+                          disabled={processingInviteId === candidate.ride_id}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md shadow-emerald-600/30 flex items-center gap-1"
+                          title="Accept invite and pool trips together"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                          {processingInviteId === candidate.ride_id ? 'Pooling...' : 'Accept & Join Pool'}
+                        </button>
+                      </div>
+                    )}
+
+                    {candidate.invite_status === 'accepted' && (
+                      <span className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Pool Active &middot; Shared Ride Linked
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Grid: Trip Details + Payment Card */}

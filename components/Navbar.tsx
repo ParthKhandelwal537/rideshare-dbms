@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -9,9 +9,14 @@ import { Car, LayoutDashboard, PlusCircle, Database, UserCheck, LogOut } from 'l
 export default function Navbar() {
   const pathname = usePathname();
   const { currentUser, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const navItems = [
-    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: currentUser ? 'Dashboard' : 'Home', href: currentUser ? '/dashboard' : '/', icon: LayoutDashboard },
     { label: 'Book Ride', href: '/book', icon: PlusCircle },
     { label: 'Admin / Live DB', href: '/admin', icon: Database },
   ];
@@ -21,7 +26,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Brand */}
-        <Link href="/dashboard" className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
             <Car className="w-5 h-5" />
           </div>
@@ -55,7 +60,9 @@ export default function Navbar() {
 
         {/* User state */}
         <div className="flex items-center gap-3">
-          {currentUser ? (
+          {!mounted ? (
+            <div className="w-20 h-8" />
+          ) : currentUser ? (
             <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-full pl-3 pr-2 py-1">
               <UserCheck className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-semibold text-slate-200">{currentUser.name}</span>

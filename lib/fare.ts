@@ -208,3 +208,86 @@ export function isLocationOnRoute(
   };
 }
 
+/**
+ * Evaluates whether two departure times and dates match within an acceptable deviation window.
+ * "time can be here and there... slight deviation but not so much that it increases the time significantly"
+ * Default allowable deviation is 45 minutes.
+ */
+export function isDateTimeCompatible(
+  dateA?: string,
+  timeA?: string,
+  dateB?: string,
+  timeB?: string,
+  maxDiffMinutes: number = 45
+): { isMatch: boolean; reason?: string } {
+  // 1. Date check: if both have a date, they must match
+  if (dateA && dateB && dateA !== dateB) {
+    return { isMatch: false, reason: `Dates differ (${dateA} vs ${dateB})` };
+  }
+
+  // 2. If either time is missing, treat as match
+  if (!timeA || !timeB) {
+    return { isMatch: true };
+  }
+
+  const cleanA = timeA.trim().toLowerCase();
+  const cleanB = timeB.trim().toLowerCase();
+
+  const isImmA = cleanA.includes('immediate') || cleanA.includes('now');
+  const isImmB = cleanB.includes('immediate') || cleanB.includes('now');
+
+  if (isImmA && isImmB) {
+    return { isMatch: true };
+  }
+
+  // Parse HH:MM (24h or with AM/PM) into minutes from midnight
+  const parseMinutes = (t: string): number | null => {
+    const match = t.match(/(\d{1,2}):(\d{2})(?:\s*(am|pm))?/i);
+    if (!match) return null;
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridian = match[3]?.toLowerCase();
+
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  };
+
+  const minA = parseMinutes(cleanA);
+  const minB = parseMinutes(cleanB);
+
+  // If one is immediate and the other is scheduled, allow if within 45 mins of current time
+  if (isImmA && minB !== null) {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    let diff = Math.abs(nowMinutes - minB);
+    if (diff > 12 * 60) diff = 24 * 60 - diff;
+    return {
+      isMatch: diff <= maxDiffMinutes,
+      reason: diff <= maxDiffMinutes ? undefined : `Time difference (${diff}m) exceeds ${maxDiffMinutes}m threshold`
+    };
+  }
+
+  if (isImmB && minA !== null) {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    let diff = Math.abs(nowMinutes - minA);
+    if (diff > 12 * 60) diff = 24 * 60 - diff;
+    return {
+      isMatch: diff <= maxDiffMinutes,
+      reason: diff <= maxDiffMinutes ? undefined : `Time difference (${diff}m) exceeds ${maxDiffMinutes}m threshold`
+    };
+  }
+
+  if (minA !== null && minB !== null) {
+    let diff = Math.abs(minA - minB);
+    if (diff > 12 * 60) diff = 24 * 60 - diff;
+    if (diff <= maxDiffMinutes) {
+      return { isMatch: true };
+    }
+    return { isMatch: false, reason: `Departure time difference (${diff} mins) exceeds ${maxDiffMinutes} mins allowed` };
+  }
+
+  return { isMatch: true };
+}

@@ -30,12 +30,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         setCurrentUser(JSON.parse(saved));
       } else {
-        // Automatically default to Parth Sharma for smooth demo
-        setCurrentUser(DEFAULT_DEMO_USER);
-        localStorage.setItem('rideshare_user', JSON.stringify(DEFAULT_DEMO_USER));
+        setCurrentUser(null);
       }
     } catch {
-      setCurrentUser(DEFAULT_DEMO_USER);
+      setCurrentUser(null);
     } finally {
       setIsLoading(false);
     }

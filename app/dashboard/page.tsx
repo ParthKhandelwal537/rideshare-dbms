@@ -6,11 +6,25 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Ride, Payment, Driver } from '@/lib/types';
-import { PlusCircle, Calendar, MapPin, ArrowRight, ShieldCheck, Clock, CheckCircle2, Car, Trash2, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Calendar, MapPin, ArrowRight, ShieldCheck, Clock, CheckCircle2, Car, Trash2, AlertTriangle, Users, Sparkles, Radio } from 'lucide-react';
 
 interface EnhancedRide extends Ride {
   payment?: Payment;
   driver?: Driver;
+}
+
+interface DashboardInvite {
+  invite_id: string;
+  sender_ride_id: string;
+  receiver_ride_id: string;
+  sender_user_id: string;
+  sender_name: string;
+  receiver_user_id: string;
+  receiver_name: string;
+  sender_pickup?: string;
+  sender_dropoff?: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
 }
 
 export default function DashboardPage() {
@@ -22,6 +36,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [invites, setInvites] = useState<DashboardInvite[]>([]);
+  const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null);
 
   const fetchRides = useCallback(async () => {
     if (!currentUser) return;
@@ -58,12 +81,42 @@ export default function DashboardPage() {
 
         setRides(combined);
       }
+
+      // Fetch pending invites where current user is receiver
+      const invitesRes = await fetch(`/api/invites?user_id=${currentUser.user_id}`);
+      const invitesData = await invitesRes.json();
+      if (invitesRes.ok && Array.isArray(invitesData.data)) {
+        setInvites(invitesData.data);
+      }
     } catch {
       showToast('Failed to load ride history', 'error');
     } finally {
       setLoading(false);
     }
   }, [currentUser, showToast]);
+
+  const handleRespondToInvite = async (invite: DashboardInvite, action: 'accept' | 'decline') => {
+    setRespondingInviteId(invite.invite_id);
+    try {
+      const res = await fetch(`/api/rides/${invite.receiver_ride_id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_ride_id: invite.sender_ride_id,
+          action
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update invite');
+
+      showToast(data.message, 'success');
+      await fetchRides();
+    } catch (err: any) {
+      showToast(err.message || 'Error updating invite', 'error');
+    } finally {
+      setRespondingInviteId(null);
+    }
+  };
 
   useEffect(() => {
     fetchRides();
@@ -103,7 +156,7 @@ export default function DashboardPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Rider Dashboard</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Welcome back, {currentUser ? currentUser.name : 'Rider'}
+            Welcome back, {mounted && currentUser ? currentUser.name : 'Rider'}
           </h1>
           <p className="text-sm text-slate-400 mt-1">
             Track your trips, payment receipts, and book new destinations in Bangalore.
@@ -130,6 +183,68 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* PENDING POOLING INVITES BANNER (Alert when another rider invited you to pool!) */}
+      {invites.filter(inv => inv.receiver_user_id === currentUser?.user_id && inv.status === 'pending').length > 0 && (
+        <div className="bg-gradient-to-r from-indigo-950/80 via-blue-950/60 to-slate-900 border-2 border-indigo-500/50 rounded-2xl p-5 shadow-2xl space-y-3 animate-in fade-in-50">
+          <div className="flex items-center justify-between pb-2 border-b border-indigo-800/40">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                Ride Pooling Invitations Received
+              </h2>
+            </div>
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+              {invites.filter(inv => inv.receiver_user_id === currentUser?.user_id && inv.status === 'pending').length} Pending
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {invites
+              .filter(inv => inv.receiver_user_id === currentUser?.user_id && inv.status === 'pending')
+              .map(inv => (
+                <div
+                  key={inv.invite_id}
+                  className="bg-slate-950/80 border border-indigo-900/60 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm">Ride Available on This Route!</span>
+                      {inv.sender_pickup && inv.sender_dropoff && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">
+                          {inv.sender_pickup} &rarr; {inv.sender_dropoff}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-slate-300 text-[11px]">
+                      There is an active ride in this route available to pool cabs together! Accepting will merge your trips into a shared vehicle, reducing both fares by <strong>30%</strong> (automated refund if you already paid).
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleRespondToInvite(inv, 'decline')}
+                      disabled={respondingInviteId === inv.invite_id}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-all"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRespondToInvite(inv, 'accept')}
+                      disabled={respondingInviteId === inv.invite_id}
+                      className="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 transition-all hover:scale-105"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {respondingInviteId === inv.invite_id ? 'Pooling...' : 'Accept & Join Pool'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -244,6 +359,31 @@ export default function DashboardPage() {
                         <span className="truncate">{ride.dropoff_location}</span>
                       </div>
                     </div>
+
+                    {/* Shared Ride Matching Status Notification */}
+                    {ride.ride_type === 'shared' && (
+                      (!ride.co_riders || ride.co_riders.length === 0) ? (
+                        <div className="mb-3.5 p-3 rounded-xl bg-gradient-to-r from-blue-950/60 via-indigo-950/40 to-slate-900 border border-indigo-500/40 flex items-center gap-2.5 text-xs text-indigo-200 shadow-sm animate-in fade-in-50">
+                          <Radio className="w-4 h-4 text-indigo-400 animate-pulse shrink-0" />
+                          <div>
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>Matching in Progress</span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">FCFS</span>
+                            </div>
+                            <div className="text-[11px] text-slate-300 mt-0.5">
+                              We are trying to match you with other people along your route. Auto-invites dispatched!
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mb-3.5 p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 flex items-center gap-2 text-xs text-emerald-300 animate-in fade-in-50">
+                          <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>
+                            <strong>Pooled Cab:</strong> Ride shared along this route ({ride.co_riders.length} co-rider joined) &bull; 30% discount applied
+                          </span>
+                        </div>
+                      )
+                    )}
 
                     {/* Driver summary if assigned */}
                     {ride.driver && (
