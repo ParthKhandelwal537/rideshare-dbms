@@ -45,11 +45,20 @@ export function formatFriendlyId(id: string | null | undefined, prefix: 'RIDE' |
   // If ID already starts with '#', return as is
   if (id.startsWith('#')) return id;
 
-  // If ID follows sequential pattern (e.g. ccccccc4-cccc-...), map to #RIDE-04
-  const sequentialMatch = id.match(/^([a-f0-9])\1{6}([0-9a-f]+)/i);
-  if (sequentialMatch) {
-    const num = parseInt(sequentialMatch[2], 16);
+  // Pattern 1: single-char sequential (e.g. ccccccc4-cccc-... → #RIDE-04)
+  const singleCharMatch = id.match(/^([a-f0-9])\1{6}([0-9a-f]+)/i);
+  if (singleCharMatch) {
+    const num = parseInt(singleCharMatch[2], 16);
     if (!isNaN(num)) {
+      return `#${prefix}-${String(num).padStart(2, '0')}`;
+    }
+  }
+
+  // Pattern 2: 2-digit decimal sequential (e.g. cccccc10-cccc-... → #RIDE-10)
+  const twoDigitMatch = id.match(/^[a-f0-9]{6}(\d{2})-/i);
+  if (twoDigitMatch) {
+    const num = parseInt(twoDigitMatch[1], 10);
+    if (!isNaN(num) && num >= 10) {
       return `#${prefix}-${String(num).padStart(2, '0')}`;
     }
   }
@@ -61,23 +70,30 @@ export function formatFriendlyId(id: string | null | undefined, prefix: 'RIDE' |
 
 /**
  * Generates an easy-to-read, sequential UUID compatible with Postgres UUID type.
- * e.g., for RIDE #4 -> 'ccccccc4-cccc-cccc-cccc-cccccccccccc'
- * e.g., for USER #4 -> '44444444-4444-4444-4444-444444444444'
+ * For indexes 1–9: uses single hex char (e.g., RIDE #4 → 'ccccccc4-cccc-...')
+ * For indexes 10+: pads to 2 decimal digits in the suffix to avoid collisions
+ *   e.g., RIDE #10 → 'cccccc10-cccc-cccc-cccc-cccccccccccc'
+ *         USER #10 → '00000010-0000-0000-0000-000000000010'
  */
 export function generateSimplifiedUuid(type: 'RIDE' | 'USER' | 'DRV' | 'VEH' | 'PAY', index: number): string {
-  const hexChar = Number(index).toString(16).slice(-1);
+  if (index >= 1 && index <= 9) {
+    const c = String(index);
+    switch (type) {
+      case 'USER': return `${c.repeat(8)}-${c.repeat(4)}-${c.repeat(4)}-${c.repeat(4)}-${c.repeat(12)}`;
+      case 'DRV':  return `aaaaaaa${c}-aaaa-aaaa-aaaa-aaaaaaaaaaaa`;
+      case 'VEH':  return `bbbbbbb${c}-bbbb-bbbb-bbbb-bbbbbbbbbbbb`;
+      case 'RIDE': return `ccccccc${c}-cccc-cccc-cccc-cccccccccccc`;
+      case 'PAY':  return `ddddddd${c}-dddd-dddd-dddd-dddddddddddd`;
+    }
+  }
+  // For index >= 10, embed 2-digit decimal in the leading segment
+  const suffix = String(index).padStart(2, '0');
   switch (type) {
-    case 'USER':
-      return `${hexChar.repeat(8)}-${hexChar.repeat(4)}-${hexChar.repeat(4)}-${hexChar.repeat(4)}-${hexChar.repeat(12)}`;
-    case 'DRV':
-      return `aaaaaaa${hexChar}-aaaa-aaaa-aaaa-aaaaaaaaaaaa`;
-    case 'VEH':
-      return `bbbbbbb${hexChar}-bbbb-bbbb-bbbb-bbbbbbbbbbbb`;
-    case 'RIDE':
-      return `ccccccc${hexChar}-cccc-cccc-cccc-cccccccccccc`;
-    case 'PAY':
-      return `ddddddd${hexChar}-dddd-dddd-dddd-dddddddddddd`;
-    default:
-      return crypto.randomUUID();
+    case 'USER': return `0000${suffix}00-0000-0000-0000-0000${suffix}000000`;
+    case 'DRV':  return `aaaaaa${suffix}-aaaa-aaaa-aaaa-aaaaaaaaaaaa`;
+    case 'VEH':  return `bbbbbb${suffix}-bbbb-bbbb-bbbb-bbbbbbbbbbbb`;
+    case 'RIDE': return `cccccc${suffix}-cccc-cccc-cccc-cccccccccccc`;
+    case 'PAY':  return `dddddd${suffix}-dddd-dddd-dddd-dddddddddddd`;
+    default:     return crypto.randomUUID();
   }
 }

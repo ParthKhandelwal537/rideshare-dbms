@@ -200,8 +200,16 @@ export async function createUser(userData: Omit<User, 'user_id'> & { user_id?: s
     throw new Error(`An account with mobile number "${userData.number}" already exists. Please Sign In.`);
   }
 
+  // Assign a sequential, human-readable UUID for easy Supabase management
+  let nextIndex = memoryStore.users.length + 1;
+  if (isSupabaseConfigured()) {
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    nextIndex = (count || 0) + 1;
+  }
+  const newUserId = userData.user_id || generateSimplifiedUuid('USER', nextIndex);
+
   const newUser: User = {
-    user_id: userData.user_id || crypto.randomUUID(),
+    user_id: newUserId,
     name: userData.name.trim(),
     email: userData.email.trim(),
     number: userData.number?.trim() || null
@@ -274,9 +282,16 @@ export async function createDriver(driverData: {
   license_no?: string | null;
   ratings?: number | null;
 }): Promise<Driver> {
+  // Assign a sequential, human-readable UUID for easy Supabase management
+  let nextDriverIndex = memoryStore.drivers.length + 1;
+  if (isSupabaseConfigured()) {
+    const { count } = await supabase.from('drivers').select('*', { count: 'exact', head: true });
+    nextDriverIndex = (count || 0) + 1;
+  }
+
   // New drivers default to 5.0 (ratings will be updated via user reviews)
   const newDriver: Driver = {
-    driver_id: crypto.randomUUID(),
+    driver_id: generateSimplifiedUuid('DRV', nextDriverIndex),
     driver_name: driverData.driver_name,
     phone_no: driverData.phone_no || null,
     license_no: driverData.license_no || null,
@@ -314,9 +329,17 @@ export async function getVehicles(): Promise<Vehicle[]> {
 }
 
 export async function createVehicle(vehicleData: Omit<Vehicle, 'vehicle_id'>): Promise<Vehicle> {
+  // Assign sequential readable vehicle ID
+  let nextVehIndex = memoryStore.vehicles.length + 1;
+  if (isSupabaseConfigured()) {
+    const { count } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+    nextVehIndex = (count || 0) + 1;
+  }
+  const newVehicleId = generateSimplifiedUuid('VEH', nextVehIndex);
+
   if (isSupabaseConfigured()) {
     const { data, error } = await supabase.from('vehicles').insert({
-      vehicle_id: crypto.randomUUID(),
+      vehicle_id: newVehicleId,
       vehicle_number: vehicleData.vehicle_number,
       vehicle_type: vehicleData.vehicle_type || null,
       capacity: vehicleData.capacity || 4,
@@ -338,7 +361,7 @@ export async function createVehicle(vehicleData: Omit<Vehicle, 'vehicle_id'>): P
   }
 
   const newVehicle: Vehicle = {
-    vehicle_id: crypto.randomUUID(),
+    vehicle_id: newVehicleId,
     vehicle_number: vehicleData.vehicle_number,
     vehicle_type: vehicleData.vehicle_type || null,
     capacity: vehicleData.capacity || 4,
@@ -597,7 +620,13 @@ export async function bookRide(params: {
     throw new Error(`Requested passengers (${passengers}) exceeds vehicle capacity (${vehicleCapacity} seats).`);
   }
 
-  const rideId = crypto.randomUUID();
+  // Assign sequential ride ID for easy Supabase management
+  let nextRideIndex = memoryStore.rides.length + 1;
+  if (isSupabaseConfigured()) {
+    const { count } = await supabase.from('rides').select('*', { count: 'exact', head: true });
+    nextRideIndex = (count || 0) + 1;
+  }
+  const rideId = generateSimplifiedUuid('RIDE', nextRideIndex);
 
   // Base fare from distance formula
   const { fare: standardFare } = calculateFareForLocations(params.pickup_location, params.dropoff_location);
@@ -656,7 +685,9 @@ export async function bookRide(params: {
       rideData = fallbackData;
     }
 
-    const paymentId = crypto.randomUUID();
+    // Assign sequential payment ID
+    const { count: payCount } = await supabase.from('payments').select('*', { count: 'exact', head: true });
+    const paymentId = generateSimplifiedUuid('PAY', (payCount || 0) + 1);
     const { data: paymentData, error: paymentError } = await supabase
       .from('payments')
       .insert({
@@ -678,6 +709,7 @@ export async function bookRide(params: {
       passengers_count: passengers,
       departure_time: departureTime,
       is_scheduled: isScheduled,
+    };
     return { ride: fullRide, payment: paymentData };
   }
 
@@ -699,7 +731,7 @@ export async function bookRide(params: {
   };
 
   const newPayment: Payment = {
-    payment_id: crypto.randomUUID(),
+    payment_id: generateSimplifiedUuid('PAY', memoryStore.payments.length + 1),
     ride_id: rideId,
     payment_mode: 'Pending Selection',
     amount: finalFare,
