@@ -170,8 +170,12 @@ const memoryStore = {
 // ==========================================
 export async function getLocations(): Promise<LocationItem[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('locations').select('*');
-    if (!error && data && data.length > 0) return data;
+    try {
+      const { data, error } = await supabase.from('locations').select('*');
+      if (!error && data && data.length > 0) return data;
+    } catch (e) {
+      console.warn('Supabase getLocations error:', e);
+    }
   }
   return memoryStore.locations;
 }
@@ -181,8 +185,20 @@ export async function getLocations(): Promise<LocationItem[]> {
 // ==========================================
 export async function getUsers(): Promise<User[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('users').select('*');
-    if (!error && data) return data;
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (!error && data && data.length > 0) {
+        // Keep memoryStore in sync with Supabase users
+        for (const u of data) {
+          if (!memoryStore.users.some(mu => mu.user_id === u.user_id)) {
+            memoryStore.users.push(u);
+          }
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase getUsers error, using memoryStore:', e);
+    }
   }
   return memoryStore.users;
 }
@@ -203,8 +219,10 @@ export async function createUser(userData: Omit<User, 'user_id'> & { user_id?: s
   // Assign a sequential, human-readable UUID for easy Supabase management
   let nextIndex = memoryStore.users.length + 1;
   if (isSupabaseConfigured()) {
-    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
-    nextIndex = (count || 0) + 1;
+    try {
+      const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+      if (count !== null && count !== undefined) nextIndex = count + 1;
+    } catch {}
   }
   const newUserId = userData.user_id || generateSimplifiedUuid('USER', nextIndex);
 
@@ -216,9 +234,18 @@ export async function createUser(userData: Omit<User, 'user_id'> & { user_id?: s
   };
 
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('users').insert(newUser).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    try {
+      const { data, error } = await supabase.from('users').insert(newUser).select().single();
+      if (!error && data) {
+        memoryStore.users.push(data);
+        return data;
+      }
+      if (error) {
+        console.warn('Supabase createUser error:', error.message);
+      }
+    } catch (supabaseErr) {
+      console.warn('Supabase createUser network error, falling back to memoryStore:', supabaseErr);
+    }
   }
 
   memoryStore.users.push(newUser);
@@ -227,20 +254,23 @@ export async function createUser(userData: Omit<User, 'user_id'> & { user_id?: s
 
 export async function deleteUser(userId: string, cascade: boolean = true): Promise<{ success: boolean; deletedUserId: string }> {
   if (isSupabaseConfigured()) {
-    if (cascade) {
-      const { data: userRides } = await supabase.from('rides').select('ride_id').eq('user_id', userId);
-      const rideIds = userRides ? userRides.map((r: any) => r.ride_id) : [];
+    try {
+      if (cascade) {
+        const { data: userRides } = await supabase.from('rides').select('ride_id').eq('user_id', userId);
+        const rideIds = userRides ? userRides.map((r: any) => r.ride_id) : [];
 
-      if (rideIds.length > 0) {
-        await supabase.from('payments').delete().in('ride_id', rideIds);
-        await supabase.from('rides').delete().in('ride_id', rideIds);
+        if (rideIds.length > 0) {
+          await supabase.from('payments').delete().in('ride_id', rideIds);
+          await supabase.from('rides').delete().in('ride_id', rideIds);
+        }
+
+        await supabase.from('reviews').delete().eq('user_id', userId);
       }
 
-      await supabase.from('reviews').delete().eq('user_id', userId);
+      await supabase.from('users').delete().eq('user_id', userId);
+    } catch (e) {
+      console.warn('Supabase deleteUser error:', e);
     }
-
-    const { error } = await supabase.from('users').delete().eq('user_id', userId);
-    if (error) throw new Error(error.message);
   }
 
   if (cascade) {
@@ -261,16 +291,20 @@ export async function deleteUser(userId: string, cascade: boolean = true): Promi
 // ==========================================
 export async function getDrivers(): Promise<Driver[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('drivers').select('*');
-    if (!error && data && data.length > 0) {
-      // Merge memoryStore drivers to guarantee full expanded fleet is always accessible
-      const merged = [...data];
-      for (const d of memoryStore.drivers) {
-        if (!merged.some(m => m.driver_id === d.driver_id || m.driver_name === d.driver_name)) {
-          merged.push(d);
+    try {
+      const { data, error } = await supabase.from('drivers').select('*');
+      if (!error && data && data.length > 0) {
+        // Merge memoryStore drivers to guarantee full expanded fleet is always accessible
+        const merged = [...data];
+        for (const d of memoryStore.drivers) {
+          if (!merged.some(m => m.driver_id === d.driver_id || m.driver_name === d.driver_name)) {
+            merged.push(d);
+          }
         }
+        return merged;
       }
-      return merged;
+    } catch (e) {
+      console.warn('Supabase getDrivers failed, using memory store:', e);
     }
   }
   return memoryStore.drivers;
@@ -285,8 +319,10 @@ export async function createDriver(driverData: {
   // Assign a sequential, human-readable UUID for easy Supabase management
   let nextDriverIndex = memoryStore.drivers.length + 1;
   if (isSupabaseConfigured()) {
-    const { count } = await supabase.from('drivers').select('*', { count: 'exact', head: true });
-    nextDriverIndex = (count || 0) + 1;
+    try {
+      const { count } = await supabase.from('drivers').select('*', { count: 'exact', head: true });
+      nextDriverIndex = (count || 0) + 1;
+    } catch {}
   }
 
   // New drivers default to 5.0 (ratings will be updated via user reviews)
@@ -299,9 +335,15 @@ export async function createDriver(driverData: {
   };
 
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('drivers').insert(newDriver).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+    try {
+      const { data, error } = await supabase.from('drivers').insert(newDriver).select().single();
+      if (!error && data) {
+        memoryStore.drivers.push(data);
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase createDriver failed, using memory store:', e);
+    }
   }
 
   memoryStore.drivers.push(newDriver);
@@ -313,16 +355,20 @@ export async function createDriver(driverData: {
 // ==========================================
 export async function getVehicles(): Promise<Vehicle[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('vehicles').select('*');
-    if (!error && data && data.length > 0) {
-      // Merge memoryStore vehicles so all vehicle types/capacities are available
-      const merged = [...data];
-      for (const v of memoryStore.vehicles) {
-        if (!merged.some(m => m.vehicle_id === v.vehicle_id || m.driver_id === v.driver_id)) {
-          merged.push(v);
+    try {
+      const { data, error } = await supabase.from('vehicles').select('*');
+      if (!error && data && data.length > 0) {
+        // Merge memoryStore vehicles so all vehicle types/capacities are available
+        const merged = [...data];
+        for (const v of memoryStore.vehicles) {
+          if (!merged.some(m => m.vehicle_id === v.vehicle_id || m.driver_id === v.driver_id)) {
+            merged.push(v);
+          }
         }
+        return merged;
       }
-      return merged;
+    } catch (e) {
+      console.warn('Supabase getVehicles failed, using memory store:', e);
     }
   }
   return memoryStore.vehicles;
@@ -332,27 +378,34 @@ export async function createVehicle(vehicleData: Omit<Vehicle, 'vehicle_id'>): P
   // Assign sequential readable vehicle ID
   let nextVehIndex = memoryStore.vehicles.length + 1;
   if (isSupabaseConfigured()) {
-    const { count } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
-    nextVehIndex = (count || 0) + 1;
+    try {
+      const { count } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+      nextVehIndex = (count || 0) + 1;
+    } catch {}
   }
   const newVehicleId = generateSimplifiedUuid('VEH', nextVehIndex);
 
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('vehicles').insert({
-      vehicle_id: newVehicleId,
-      vehicle_number: vehicleData.vehicle_number,
-      vehicle_type: vehicleData.vehicle_type || null,
-      capacity: vehicleData.capacity || 4,
-      driver_id: vehicleData.driver_id
-    }).select().single();
+    try {
+      const { data, error } = await supabase.from('vehicles').insert({
+        vehicle_id: newVehicleId,
+        vehicle_number: vehicleData.vehicle_number,
+        vehicle_type: vehicleData.vehicle_type || null,
+        capacity: vehicleData.capacity || 4,
+        driver_id: vehicleData.driver_id
+      }).select().single();
 
-    if (error) {
-      if (error.message.includes('unique') || error.code === '23505') {
+      if (!error && data) {
+        memoryStore.vehicles.push(data);
+        return data;
+      }
+      if (error && (error.message.includes('unique') || error.code === '23505')) {
         throw new Error('This driver already has a vehicle.');
       }
-      throw new Error(error.message);
+    } catch (e: any) {
+      if (e.message?.includes('already has a vehicle')) throw e;
+      console.warn('Supabase createVehicle failed, using memory store:', e);
     }
-    return data;
   }
 
   const existing = memoryStore.vehicles.find(v => v.driver_id === vehicleData.driver_id);
@@ -377,12 +430,23 @@ export async function createVehicle(vehicleData: Omit<Vehicle, 'vehicle_id'>): P
 export async function getRides(filters?: { user_id?: string; driver_id?: string }): Promise<Ride[]> {
   let result: Ride[] = [];
   if (isSupabaseConfigured()) {
-    let query = supabase.from('rides').select('*');
-    if (filters?.user_id) query = query.eq('user_id', filters.user_id);
-    if (filters?.driver_id) query = query.eq('driver_id', filters.driver_id);
-    const { data, error } = await query.order('ride_date', { ascending: false });
-    if (!error && data) result = data;
-    else result = [...memoryStore.rides];
+    try {
+      let query = supabase.from('rides').select('*');
+      if (filters?.user_id) query = query.eq('user_id', filters.user_id);
+      if (filters?.driver_id) query = query.eq('driver_id', filters.driver_id);
+      const { data, error } = await query.order('ride_date', { ascending: false });
+      if (!error && data) {
+        // Merge Supabase rides with any memoryStore rides that aren't already in Supabase
+        const existingIds = new Set(data.map(r => r.ride_id));
+        const extraMemRides = memoryStore.rides.filter(r => !existingIds.has(r.ride_id));
+        result = [...data, ...extraMemRides];
+      } else {
+        result = [...memoryStore.rides];
+      }
+    } catch (e) {
+      console.warn('Supabase getRides failed, using memory store:', e);
+      result = [...memoryStore.rides];
+    }
   } else {
     result = [...memoryStore.rides];
   }
@@ -419,53 +483,67 @@ export async function getRideById(id: string): Promise<{
   user?: User;
 } | null> {
   if (isSupabaseConfigured()) {
-    const { data: ride, error } = await supabase.from('rides').select('*').eq('ride_id', id).single();
-    if (error || !ride) return null;
+    try {
+      const { data: ride, error } = await supabase.from('rides').select('*').eq('ride_id', id).single();
+      if (!error && ride) {
+        const [paymentRes, driverRes, userRes] = await Promise.all([
+          supabase.from('payments').select('*').eq('ride_id', id).maybeSingle(),
+          supabase.from('drivers').select('*').eq('driver_id', ride.driver_id).maybeSingle(),
+          supabase.from('users').select('*').eq('user_id', ride.user_id).maybeSingle()
+        ]);
 
-    const [paymentRes, driverRes, userRes] = await Promise.all([
-      supabase.from('payments').select('*').eq('ride_id', id).maybeSingle(),
-      supabase.from('drivers').select('*').eq('driver_id', ride.driver_id).maybeSingle(),
-      supabase.from('users').select('*').eq('user_id', ride.user_id).maybeSingle()
-    ]);
+        let driver = driverRes?.data;
+        if (!driver && ride.driver_id) {
+          driver = memoryStore.drivers.find(d => d.driver_id === ride.driver_id) || null;
+        }
 
-    let driver = driverRes.data;
-    if (!driver && ride.driver_id) {
-      driver = memoryStore.drivers.find(d => d.driver_id === ride.driver_id) || null;
-    }
+        let vehicle = null;
+        if (ride.driver_id) {
+          const vRes = await supabase.from('vehicles').select('*').eq('driver_id', ride.driver_id).maybeSingle();
+          vehicle = vRes?.data;
+          if (!vehicle) {
+            vehicle = memoryStore.vehicles.find(v => v.driver_id === ride.driver_id) || null;
+          }
+        }
 
-    let vehicle = null;
-    if (ride.driver_id) {
-      const vRes = await supabase.from('vehicles').select('*').eq('driver_id', ride.driver_id).maybeSingle();
-      vehicle = vRes.data;
-      if (!vehicle) {
-        vehicle = memoryStore.vehicles.find(v => v.driver_id === ride.driver_id) || null;
+        let user = userRes?.data;
+        if (!user && ride.user_id) {
+          user = memoryStore.users.find(u => u.user_id === ride.user_id) || null;
+        }
+
+        const cached = rideDynamicCache.get(id);
+        const finalStatus = cached?.status || ride.ride_status || 'driver_assigned';
+        const finalType = cached?.ride_type || ride.ride_type || 'solo';
+        const finalPassengers = cached?.passengers_count || ride.passengers_count || 1;
+        const finalDeparture = cached?.departure_time || '20:30';
+        const finalCoRiders = cached?.co_riders || [];
+        const finalRefund = cached?.refund_amount !== undefined ? cached.refund_amount : (paymentRes?.data?.refund_amount || 0);
+
+        let payment = paymentRes?.data;
+        if (!payment) {
+          payment = memoryStore.payments.find(p => p.ride_id === id) || null;
+        }
+
+        return {
+          ride: {
+            ...ride,
+            ride_status: finalStatus,
+            ride_type: finalType,
+            passengers_count: finalPassengers,
+            departure_time: finalDeparture,
+            is_scheduled: cached?.is_scheduled !== undefined ? cached.is_scheduled : ride.is_scheduled,
+            pool_ride_id: cached?.pool_ride_id || ride.pool_ride_id,
+            co_riders: finalCoRiders
+          },
+          payment: payment ? { ...payment, refund_amount: finalRefund } : undefined,
+          driver: driver || undefined,
+          vehicle: vehicle || undefined,
+          user: user || undefined
+        };
       }
+    } catch (e) {
+      console.warn(`Supabase getRideById lookup failed for ${id}, falling back to memoryStore:`, e);
     }
-
-    const cached = rideDynamicCache.get(id);
-    const finalStatus = cached?.status || ride.ride_status || 'driver_assigned';
-    const finalType = cached?.ride_type || ride.ride_type || 'solo';
-    const finalPassengers = cached?.passengers_count || ride.passengers_count || 1;
-    const finalDeparture = cached?.departure_time || '20:30';
-    const finalCoRiders = cached?.co_riders || [];
-    const finalRefund = cached?.refund_amount !== undefined ? cached.refund_amount : (paymentRes.data?.refund_amount || 0);
-
-    return {
-      ride: {
-        ...ride,
-        ride_status: finalStatus,
-        ride_type: finalType,
-        passengers_count: finalPassengers,
-        departure_time: finalDeparture,
-        is_scheduled: cached?.is_scheduled !== undefined ? cached.is_scheduled : ride.is_scheduled,
-        pool_ride_id: cached?.pool_ride_id || ride.pool_ride_id,
-        co_riders: finalCoRiders
-      },
-      payment: paymentRes.data ? { ...paymentRes.data, refund_amount: finalRefund } : undefined,
-      driver: driver || undefined,
-      vehicle: vehicle || undefined,
-      user: userRes.data || undefined
-    };
   }
 
   const ride = memoryStore.rides.find(r => r.ride_id === id);
@@ -628,13 +706,15 @@ export async function bookRide(params: {
   }
   const rideId = generateSimplifiedUuid('RIDE', nextRideIndex);
 
-  // Base fare from distance formula
-  const { fare: standardFare } = calculateFareForLocations(params.pickup_location, params.dropoff_location);
+  // Base fare from distance formula considering assigned vehicle category
+  const vehicleType = assignedVehicle?.vehicle_type || params.vehicle_type_preference;
+  const { fare: vehicleBaseFare } = calculateFareForLocations(params.pickup_location, params.dropoff_location, vehicleType);
 
-  // Apply 30% discount for shared rides!
+  // Apply per-seat pricing for shared rides (30% discount per seat)
+  const perSeatFare = Math.round(vehicleBaseFare * 0.70);
   const finalFare = rideType === 'shared'
-    ? Math.round(standardFare * 0.70)
-    : standardFare;
+    ? Math.round(perSeatFare * passengers)
+    : vehicleBaseFare;
 
   // Cache ride dynamic metadata
   rideDynamicCache.set(rideId, {
@@ -651,66 +731,77 @@ export async function bookRide(params: {
   });
 
   if (isSupabaseConfigured()) {
-    const corePayload = {
-      ride_id: rideId,
-      user_id: params.user_id,
-      driver_id: assignedDriver.driver_id,
-      pickup_location: params.pickup_location,
-      dropoff_location: params.dropoff_location,
-      ride_date: params.ride_date || new Date().toISOString().split('T')[0],
-      fare: finalFare
-    };
+    try {
+      const corePayload = {
+        ride_id: rideId,
+        user_id: params.user_id,
+        driver_id: assignedDriver.driver_id,
+        pickup_location: params.pickup_location,
+        dropoff_location: params.dropoff_location,
+        ride_date: params.ride_date || new Date().toISOString().split('T')[0],
+        fare: finalFare
+      };
 
-    let rideData: any = null;
-    const { data: fullInsertData, error: fullInsertError } = await supabase
-      .from('rides')
-      .insert({
-        ...corePayload,
-        ride_status: 'driver_assigned',
-        ride_type: rideType,
-        passengers_count: passengers
-      })
-      .select()
-      .single();
-
-    if (!fullInsertError && fullInsertData) {
-      rideData = fullInsertData;
-    } else {
-      const { data: fallbackData, error: fallbackError } = await supabase
+      let rideData: any = null;
+      const { data: fullInsertData, error: fullInsertError } = await supabase
         .from('rides')
-        .insert(corePayload)
+        .insert({
+          ...corePayload,
+          ride_status: 'driver_assigned',
+          ride_type: rideType,
+          passengers_count: passengers
+        })
         .select()
         .single();
-      if (fallbackError) throw new Error(fallbackError.message);
-      rideData = fallbackData;
+
+      if (!fullInsertError && fullInsertData) {
+        rideData = fullInsertData;
+      } else {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('rides')
+          .insert(corePayload)
+          .select()
+          .single();
+        if (fallbackError) throw new Error(fallbackError.message);
+        rideData = fallbackData;
+      }
+
+      // Assign sequential payment ID
+      const { count: payCount } = await supabase.from('payments').select('*', { count: 'exact', head: true });
+      const paymentId = generateSimplifiedUuid('PAY', (payCount || 0) + 1);
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          payment_id: paymentId,
+          ride_id: rideId,
+          payment_mode: 'Pending Selection',
+          amount: finalFare,
+          payment_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (paymentError) throw new Error(paymentError.message);
+
+      const fullRide: Ride = {
+        ...rideData,
+        ride_status: 'driver_assigned',
+        ride_type: rideType,
+        passengers_count: passengers,
+        departure_time: departureTime,
+        is_scheduled: isScheduled,
+      };
+
+      // Sync to local memoryStore as well
+      memoryStore.rides.unshift(fullRide);
+      if (paymentData) {
+        memoryStore.payments.unshift(paymentData);
+      }
+
+      return { ride: fullRide, payment: paymentData };
+    } catch (supabaseErr) {
+      console.warn('Supabase bookRide operation failed, falling back to memory store:', supabaseErr);
     }
-
-    // Assign sequential payment ID
-    const { count: payCount } = await supabase.from('payments').select('*', { count: 'exact', head: true });
-    const paymentId = generateSimplifiedUuid('PAY', (payCount || 0) + 1);
-    const { data: paymentData, error: paymentError } = await supabase
-      .from('payments')
-      .insert({
-        payment_id: paymentId,
-        ride_id: rideId,
-        payment_mode: 'Pending Selection',
-        amount: finalFare,
-        payment_status: 'pending'
-      })
-      .select()
-      .single();
-
-    if (paymentError) throw new Error(paymentError.message);
-
-    const fullRide: Ride = {
-      ...rideData,
-      ride_status: 'driver_assigned',
-      ride_type: rideType,
-      passengers_count: passengers,
-      departure_time: departureTime,
-      is_scheduled: isScheduled,
-    };
-    return { ride: fullRide, payment: paymentData };
   }
 
   // Memory fallback
@@ -880,9 +971,18 @@ export async function getMatchingBookedRides(rideId: string): Promise<MatchedBoo
   // Retrieve all rides
   let allRides: Ride[] = [];
   if (isSupabaseConfigured()) {
-    const { data } = await supabase.from('rides').select('*');
-    if (data && data.length > 0) allRides = data;
-    else allRides = memoryStore.rides;
+    try {
+      const { data } = await supabase.from('rides').select('*');
+      if (data && data.length > 0) {
+        const existingIds = new Set(data.map(r => r.ride_id));
+        const extraMemRides = memoryStore.rides.filter(r => !existingIds.has(r.ride_id));
+        allRides = [...data, ...extraMemRides];
+      } else {
+        allRides = memoryStore.rides;
+      }
+    } catch {
+      allRides = memoryStore.rides;
+    }
   } else {
     allRides = memoryStore.rides;
   }
@@ -1265,12 +1365,16 @@ export async function sendOrAcceptPoolInvite(
     }
 
     if (isSupabaseConfigured()) {
-      await Promise.all([
-        supabase.from('rides').update({ fare: pooledFareA }).eq('ride_id', senderRideId),
-        supabase.from('rides').update({ fare: pooledFareB }).eq('ride_id', targetRideId),
-        supabase.from('payments').update({ amount: pooledFareA }).eq('ride_id', senderRideId),
-        supabase.from('payments').update({ amount: pooledFareB }).eq('ride_id', targetRideId)
-      ]);
+      try {
+        await Promise.all([
+          supabase.from('rides').update({ fare: pooledFareA }).eq('ride_id', senderRideId),
+          supabase.from('rides').update({ fare: pooledFareB }).eq('ride_id', targetRideId),
+          supabase.from('payments').update({ amount: pooledFareA }).eq('ride_id', senderRideId),
+          supabase.from('payments').update({ amount: pooledFareB }).eq('ride_id', targetRideId)
+        ]);
+      } catch (e) {
+        console.warn('Supabase pool update failed:', e);
+      }
     }
 
     let refundMsg = '';
@@ -1341,12 +1445,19 @@ export async function updateRide(
     throw new Error("Pickup and dropoff can't be the same.");
   }
 
-  // Base fare from Haversine
-  const { fare: standardFare } = calculateFareForLocations(pickup, dropoff);
+  // Base fare from Haversine considering assigned vehicle category
+  const vType = rideDetail.vehicle?.vehicle_type;
+  const { fare: standardFare } = calculateFareForLocations(pickup, dropoff, vType);
 
-  // Dynamic pooling calculation based on co-riders
-  const totalRiders = rideType === 'shared' ? 1 + coRiders.length : 1;
-  const { finalFare } = calculateDynamicFare(standardFare, rideType, totalRiders);
+  // Dynamic pooling calculation based on co-riders and party seat count
+  let finalFare: number;
+  if (rideType === 'shared') {
+    const totalRiders = 1 + coRiders.length;
+    const { finalFare: pooledPerRiderFare } = calculateDynamicFare(standardFare, rideType, totalRiders);
+    finalFare = Math.round(pooledPerRiderFare * passengers);
+  } else {
+    finalFare = standardFare;
+  }
 
   // Handle refund if ride was already paid and fare decreased
   const oldFare = rideDetail.ride.fare;
@@ -1370,65 +1481,19 @@ export async function updateRide(
     co_riders: coRiders
   });
 
-  if (isSupabaseConfigured()) {
-    const { data: updatedRide, error: rideError } = await supabase
-      .from('rides')
-      .update({
-        pickup_location: pickup,
-        dropoff_location: dropoff,
-        ride_date: updates.ride_date || rideDetail.ride.ride_date,
-        fare: finalFare
-      })
-      .eq('ride_id', rideId)
-      .select()
-      .single();
-
-    if (rideError) throw new Error(rideError.message);
-
-    // Sync payment amount
-    const { data: updatedPayment } = await supabase
-      .from('payments')
-      .update({ amount: finalFare })
-      .eq('ride_id', rideId)
-      .select()
-      .single();
-
-    if (rideType === 'shared') {
-      try {
-        await autoDispatchPoolInvites(rideId);
-      } catch (e) {
-        console.error('Auto-dispatch error in Supabase updateRide:', e);
-      }
-    }
-
-    return {
-      ride: {
-        ...updatedRide,
-        ride_status: status,
-        ride_type: rideType,
-        passengers_count: passengers,
-        departure_time: departureTime,
-        is_scheduled: updates.is_scheduled !== undefined ? updates.is_scheduled : rideDetail.ride.is_scheduled,
-        pool_ride_id: updates.pool_ride_id || rideDetail.ride.pool_ride_id,
-        co_riders: coRiders,
-        fare: finalFare
-      },
-      payment: updatedPayment ? { ...updatedPayment, refund_amount: totalRefund } : undefined
+  // Always update memory store
+  const rideIndex = memoryStore.rides.findIndex(r => r.ride_id === rideId);
+  if (rideIndex !== -1) {
+    memoryStore.rides[rideIndex] = {
+      ...memoryStore.rides[rideIndex],
+      pickup_location: pickup,
+      dropoff_location: dropoff,
+      ride_date: updates.ride_date || memoryStore.rides[rideIndex].ride_date,
+      fare: finalFare,
+      ride_type: rideType,
+      passengers_count: passengers
     };
   }
-
-  const rideIndex = memoryStore.rides.findIndex(r => r.ride_id === rideId);
-  if (rideIndex === -1) throw new Error('Ride not found.');
-
-  memoryStore.rides[rideIndex] = {
-    ...memoryStore.rides[rideIndex],
-    pickup_location: pickup,
-    dropoff_location: dropoff,
-    ride_date: updates.ride_date || memoryStore.rides[rideIndex].ride_date,
-    fare: finalFare,
-    ride_type: rideType,
-    passengers_count: passengers
-  };
 
   const paymentIndex = memoryStore.payments.findIndex(p => p.ride_id === rideId);
   if (paymentIndex !== -1) {
@@ -1438,23 +1503,73 @@ export async function updateRide(
     }
   }
 
+  let updatedRideData: any = null;
+  let updatedPaymentData: any = null;
+
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: updatedRide, error: rideError } = await supabase
+        .from('rides')
+        .update({
+          pickup_location: pickup,
+          dropoff_location: dropoff,
+          ride_date: updates.ride_date || rideDetail.ride.ride_date,
+          fare: finalFare
+        })
+        .eq('ride_id', rideId)
+        .select()
+        .single();
+
+      if (!rideError && updatedRide) {
+        updatedRideData = updatedRide;
+      }
+
+      const { data: updatedPayment } = await supabase
+        .from('payments')
+        .update({ amount: finalFare })
+        .eq('ride_id', rideId)
+        .select()
+        .single();
+
+      if (updatedPayment) {
+        updatedPaymentData = updatedPayment;
+      }
+    } catch (e) {
+      console.warn('Supabase updateRide failed, using local update:', e);
+    }
+  }
+
   if (rideType === 'shared') {
     try {
       await autoDispatchPoolInvites(rideId);
     } catch (e) {
-      console.error('Auto-dispatch error in memory updateRide:', e);
+      console.error('Auto-dispatch error in updateRide:', e);
     }
   }
 
+  const returnedRide: Ride = {
+    ...(updatedRideData || (rideIndex !== -1 ? memoryStore.rides[rideIndex] : rideDetail.ride)),
+    pickup_location: pickup,
+    dropoff_location: dropoff,
+    fare: finalFare,
+    ride_status: status,
+    ride_type: rideType,
+    passengers_count: passengers,
+    departure_time: departureTime,
+    is_scheduled: updates.is_scheduled !== undefined ? updates.is_scheduled : rideDetail.ride.is_scheduled,
+    pool_ride_id: updates.pool_ride_id || rideDetail.ride.pool_ride_id,
+    co_riders: coRiders
+  };
+
+  const returnedPayment: Payment | undefined = updatedPaymentData
+    ? { ...updatedPaymentData, refund_amount: totalRefund }
+    : (paymentIndex !== -1
+      ? { ...memoryStore.payments[paymentIndex], refund_amount: totalRefund }
+      : (rideDetail.payment ? { ...rideDetail.payment, amount: finalFare, refund_amount: totalRefund } : undefined));
+
   return {
-    ride: {
-      ...memoryStore.rides[rideIndex],
-      departure_time: departureTime,
-      is_scheduled: updates.is_scheduled !== undefined ? updates.is_scheduled : rideDetail.ride.is_scheduled,
-      pool_ride_id: updates.pool_ride_id || rideDetail.ride.pool_ride_id,
-      co_riders: coRiders
-    },
-    payment: paymentIndex !== -1 ? { ...memoryStore.payments[paymentIndex], refund_amount: totalRefund } : undefined
+    ride: returnedRide,
+    payment: returnedPayment
   };
 }
 
@@ -1541,9 +1656,12 @@ export async function deleteRide(rideId: string): Promise<boolean> {
     try {
       await supabase.from('payments').delete().eq('ride_id', rideId);
     } catch {}
-    const { error } = await supabase.from('rides').delete().eq('ride_id', rideId);
-    if (error) throw new Error(error.message);
-    return true;
+    try {
+      const { error } = await supabase.from('rides').delete().eq('ride_id', rideId);
+      if (error) console.warn('Supabase delete ride warning:', error.message);
+    } catch (e) {
+      console.warn('Supabase deleteRide failed, proceeding with memory delete:', e);
+    }
   }
 
   memoryStore.rides = memoryStore.rides.filter(r => r.ride_id !== rideId);
@@ -1556,8 +1674,16 @@ export async function deleteRide(rideId: string): Promise<boolean> {
 // ==========================================
 export async function getPayments(): Promise<Payment[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('payments').select('*');
-    if (!error && data) return data;
+    try {
+      const { data, error } = await supabase.from('payments').select('*');
+      if (!error && data) {
+        const existingIds = new Set(data.map(p => p.payment_id));
+        const extraMem = memoryStore.payments.filter(p => !existingIds.has(p.payment_id));
+        return [...data, ...extraMem];
+      }
+    } catch (e) {
+      console.warn('Supabase getPayments failed, using memory store:', e);
+    }
   }
   return memoryStore.payments;
 }
@@ -1566,18 +1692,27 @@ export async function completePayment(paymentId: string, paymentMode?: string): 
   const mode = paymentMode || 'UPI (Google Pay)';
 
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase
-      .from('payments')
-      .update({
-        payment_status: 'completed',
-        payment_mode: mode
-      })
-      .eq('payment_id', paymentId)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .update({
+          payment_status: 'completed',
+          payment_mode: mode
+        })
+        .eq('payment_id', paymentId)
+        .select()
+        .single();
 
-    if (error) throw new Error(error.message);
-    return data;
+      if (!error && data) {
+        const pIdx = memoryStore.payments.findIndex(p => p.payment_id === paymentId);
+        if (pIdx !== -1) {
+          memoryStore.payments[pIdx] = data;
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase completePayment failed, using memory store:', e);
+    }
   }
 
   const payment = memoryStore.payments.find(p => p.payment_id === paymentId);
@@ -1593,25 +1728,29 @@ export async function completePayment(paymentId: string, paymentMode?: string): 
 // ==========================================
 export async function getReviews(): Promise<Review[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('reviews').select('*');
-    if (!error && data) {
-      return data.map((rev: any) => {
-        let rating = rev.rating;
-        let comments = rev.comments || '';
-        const match = comments.match(/^\[RATING:(\d+)\]\s*([\s\S]*)$/);
-        if (match) {
-          rating = parseInt(match[1], 10);
-          comments = match[2];
-        } else if (rating === undefined || rating === null) {
-          const mem = memoryStore.reviews.find(m => m.review_id === rev.review_id);
-          rating = mem?.rating ?? 5;
-        }
-        return {
-          ...rev,
-          comments,
-          rating: typeof rating === 'number' ? rating : 5
-        };
-      });
+    try {
+      const { data, error } = await supabase.from('reviews').select('*');
+      if (!error && data) {
+        return data.map((rev: any) => {
+          let rating = rev.rating;
+          let comments = rev.comments || '';
+          const match = comments.match(/^\[RATING:(\d+)\]\s*([\s\S]*)$/);
+          if (match) {
+            rating = parseInt(match[1], 10);
+            comments = match[2];
+          } else if (rating === undefined || rating === null) {
+            const mem = memoryStore.reviews.find(m => m.review_id === rev.review_id);
+            rating = mem?.rating ?? 5;
+          }
+          return {
+            ...rev,
+            comments,
+            rating: typeof rating === 'number' ? rating : 5
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Supabase getReviews failed, using memory store:', e);
     }
   }
   return memoryStore.reviews;
@@ -1631,43 +1770,47 @@ export async function createReview(userId: string, comments: string, rating: num
   };
 
   if (isSupabaseConfigured()) {
-    let reviewData: any = null;
-    const { data: fullRevData, error: fullRevError } = await supabase
-      .from('reviews')
-      .insert({
-        review_id: newReview.review_id,
-        user_id: newReview.user_id,
-        comments: newReview.comments,
-        rating: newReview.rating
-      })
-      .select()
-      .single();
-
-    if (!fullRevError && fullRevData) {
-      reviewData = fullRevData;
-    } else {
-      const encodedComments = `[RATING:${rating}] ${cleanComments}`;
-      const { data: fallbackData, error: fallbackError } = await supabase
+    try {
+      let reviewData: any = null;
+      const { data: fullRevData, error: fullRevError } = await supabase
         .from('reviews')
         .insert({
           review_id: newReview.review_id,
           user_id: newReview.user_id,
-          comments: encodedComments
+          comments: newReview.comments,
+          rating: newReview.rating
         })
         .select()
         .single();
-      if (fallbackError) throw new Error(fallbackError.message);
-      reviewData = { ...fallbackData, comments: cleanComments, rating };
+
+      if (!fullRevError && fullRevData) {
+        reviewData = fullRevData;
+      } else {
+        const encodedComments = `[RATING:${rating}] ${cleanComments}`;
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('reviews')
+          .insert({
+            review_id: newReview.review_id,
+            user_id: newReview.user_id,
+            comments: encodedComments
+          })
+          .select()
+          .single();
+        if (fallbackError) throw new Error(fallbackError.message);
+        reviewData = { ...fallbackData, comments: cleanComments, rating };
+      }
+
+      memoryStore.reviews.unshift({
+        review_id: newReview.review_id,
+        user_id: userId,
+        comments: cleanComments,
+        rating
+      });
+
+      return reviewData;
+    } catch (e) {
+      console.warn('Supabase createReview failed, using memory store:', e);
     }
-
-    memoryStore.reviews.unshift({
-      review_id: newReview.review_id,
-      user_id: userId,
-      comments: cleanComments,
-      rating
-    });
-
-    return reviewData;
   }
 
   memoryStore.reviews.unshift(newReview);
@@ -1679,14 +1822,18 @@ export async function createReview(userId: string, comments: string, rating: num
 // ==========================================
 export async function getFullRideDetails(): Promise<RideFullDetails[]> {
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.from('ride_full_details').select('*');
-    if (!error && data) {
-      return data.map(r => ({
-        ...r,
-        ride_status: 'driver_assigned',
-        ride_type: 'solo',
-        passengers_count: 1
-      }));
+    try {
+      const { data, error } = await supabase.from('ride_full_details').select('*');
+      if (!error && data) {
+        return data.map(r => ({
+          ...r,
+          ride_status: 'driver_assigned',
+          ride_type: 'solo',
+          passengers_count: 1
+        }));
+      }
+    } catch (e) {
+      console.warn('Supabase getFullRideDetails failed, using memory store:', e);
     }
   }
 

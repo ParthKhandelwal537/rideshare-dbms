@@ -37,19 +37,53 @@ export function calculateHaversineKm(
   return Number((R * c).toFixed(2));
 }
 
+export interface VehiclePricing {
+  baseFare: number;
+  ratePerKm: number;
+  multiplier: number;
+  category: 'Hatchback' | 'Sedan' | 'SUV' | 'XL MUV';
+  displayName: string;
+}
+
+export const VEHICLE_PRICING: Record<string, VehiclePricing> = {
+  Hatchback: { baseFare: 50, ratePerKm: 12, multiplier: 1.0, category: 'Hatchback', displayName: 'Hatchback' },
+  Sedan: { baseFare: 65, ratePerKm: 15, multiplier: 1.25, category: 'Sedan', displayName: 'Sedan' },
+  SUV: { baseFare: 85, ratePerKm: 19, multiplier: 1.6, category: 'SUV', displayName: 'SUV' },
+  'XL MUV': { baseFare: 110, ratePerKm: 23, multiplier: 1.9, category: 'XL MUV', displayName: 'XL MUV' },
+};
+
+export function getVehiclePricing(vehicleType?: string): VehiclePricing {
+  if (!vehicleType || vehicleType === 'any') {
+    return VEHICLE_PRICING['Hatchback'];
+  }
+  const low = vehicleType.toLowerCase();
+  if (low.includes('xl') || low.includes('muv') || low.includes('ertiga')) {
+    return VEHICLE_PRICING['XL MUV'];
+  }
+  if (low.includes('suv') || low.includes('creta') || low.includes('innova')) {
+    return VEHICLE_PRICING['SUV'];
+  }
+  if (low.includes('sedan') || low.includes('etios') || low.includes('city') || low.includes('dzire')) {
+    return VEHICLE_PRICING['Sedan'];
+  }
+  return VEHICLE_PRICING['Hatchback'];
+}
+
 /**
- * Computes fare given pickup and dropoff location names.
- * Mirrors calculate_fare() trigger in PostgreSQL schema.
+ * Computes fare given pickup, dropoff location names, and optional vehicle type.
+ * Mirrors calculate_fare() trigger in PostgreSQL schema with vehicle category scaling.
  */
 export function calculateFareForLocations(
   pickupName: string,
-  dropoffName: string
-): { distanceKm: number; fare: number } {
+  dropoffName: string,
+  vehicleType?: string
+): { distanceKm: number; fare: number; pricing: VehiclePricing } {
   const pickup = LOCATIONS_DATA[pickupName];
   const dropoff = LOCATIONS_DATA[dropoffName];
+  const pricing = getVehiclePricing(vehicleType);
 
   if (!pickup || !dropoff) {
-    return { distanceKm: 0, fare: BASE_FARE };
+    return { distanceKm: 0, fare: pricing.baseFare, pricing };
   }
 
   const distanceKm = calculateHaversineKm(
@@ -58,8 +92,55 @@ export function calculateFareForLocations(
     dropoff.lat,
     dropoff.lon
   );
-  const fare = Math.round(BASE_FARE + RATE_PER_KM * distanceKm);
-  return { distanceKm, fare };
+  const fare = Math.round(pricing.baseFare + pricing.ratePerKm * distanceKm);
+  return { distanceKm, fare, pricing };
+}
+
+/**
+ * Computes complete fare for booking depending on vehicle category, private vs shared ride,
+ * and number of seats required for the party.
+ */
+export function calculateBookingFare(params: {
+  pickup: string;
+  dropoff: string;
+  vehicleType?: string;
+  rideType: 'solo' | 'shared';
+  passengersCount: number;
+}): {
+  distanceKm: number;
+  vehicleBaseFare: number;
+  perSeatFare: number;
+  finalFare: number;
+  pricing: VehiclePricing;
+} {
+  const { distanceKm, fare: vehicleBaseFare, pricing } = calculateFareForLocations(
+    params.pickup,
+    params.dropoff,
+    params.vehicleType
+  );
+
+  const seats = Math.max(1, params.passengersCount || 1);
+  const perSeatFare = Math.round(vehicleBaseFare * 0.70); // 30% pooling discount per seat
+
+  if (params.rideType === 'shared') {
+    const finalFare = Math.round(perSeatFare * seats);
+    return {
+      distanceKm,
+      vehicleBaseFare,
+      perSeatFare,
+      finalFare,
+      pricing,
+    };
+  }
+
+  // Private ride: entire vehicle reserved for party
+  return {
+    distanceKm,
+    vehicleBaseFare,
+    perSeatFare,
+    finalFare: vehicleBaseFare,
+    pricing,
+  };
 }
 
 /**

@@ -1,0 +1,37 @@
+\chapter{System Requirement}
+
+\section{Hardware Requirements}
+\textbf{Client / Development Workstation:}
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Processor:} Multi-core 64-bit Intel Core i5/i7 (8th Gen+), AMD Ryzen 5/7, or Apple Silicon M-Series.
+    \item \textbf{RAM:} Minimum 8 GB DDR4 (16 GB recommended for concurrent Next.js dev server, TypeScript compiler, and browser).
+    \item \textbf{Storage:} Minimum 500 MB free solid-state drive (SSD) storage for repository, dependencies, and build caches.
+    \item \textbf{Display:} Full HD ($1920 \times 1080$) resolution for responsive layout debugging and multi-table monitoring.
+\end{itemize}
+
+\textbf{Server / Cloud Infrastructure:}
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Cloud Host:} Supabase Managed PostgreSQL Cloud (AWS infrastructure).
+    \item \textbf{Compute \& Storage Engine:} Burstable virtual compute with dedicated write-ahead logging (WAL) and NVMe block storage.
+\end{itemize}
+
+\section{Software Requirements}
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Operating System:} Microsoft Windows 10/11 (64-bit), macOS Monterey+, or Ubuntu Linux 20.04 LTS+.
+    \item \textbf{Runtime Environment:} Node.js v18.17.0 LTS or v20.x LTS with Node Package Manager (npm).
+    \item \textbf{Database Management System:} PostgreSQL 15.x with PL/pgSQL procedural extensions and \texttt{pgcrypto}.
+    \item \textbf{Web Framework \& Frontend:} Next.js 16 (App Router), React 19, TypeScript 5.x, and Tailwind CSS v4.
+    \item \textbf{Database Client:} Official Supabase Client (\texttt{@supabase/supabase-js} v2.x) with WebSocket Realtime protocol.
+\end{itemize}
+
+\section{Functional \& Non-Functional Requirements}
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{FR1 -- User Authentication Simulation:} Passwordless OTP verification and profile lifecycle management.
+    \item \textbf{FR2 -- Fleet Management:} Strict $1:1$ vehicle ownership mapping enforced via database \texttt{UNIQUE} constraint.
+    \item \textbf{FR3 -- Ride Dispatching:} Real-time trip matching, driver allocation, and passenger capacity bounds.
+    \item \textbf{FR4 -- In-Database Fare Trigger:} Haversine distance computation and automatic fare calculation.
+    \item \textbf{FR5 -- Smart Cab Pooling:} Dynamic multi-rider route matching and progressive discount splitting.
+    \item \textbf{FR6 -- Full-Stack CRUD Demonstration:} Interactive Store, Retrieve, Update, and Delete actions.
+    \item \textbf{FR7 -- Invoice Lock Guarantee:} Rejection of edits on completed/paid rides (HTTP 400).
+    \item \textbf{Non-Functional Requirements:} ACID compliance, sub-50ms query response times, and parameterized SQL security against SQL injection.
+\end{itemize}

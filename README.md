@@ -4,7 +4,7 @@
 [![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Database%20%26%20Realtime-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
+[![Supabase](<https://img.shields.io/badge/Supabase-Database%20%26%20Realtime-3ECF8E?style=for-the-badge&logo=supabase>)](https://supabase.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 
 An enterprise-grade, evaluation-ready relational ridesharing and multi-user cab pooling web application designed for **Database Management Systems (DBMS CIA 3)**. Built on top of a rigorously normalized PostgreSQL schema on Supabase, featuring database triggers for dynamic fare calculation, relational views, strict referential integrity with cascade controls, live WebSocket subscriptions, and a modern responsive dashboard.
@@ -15,20 +15,20 @@ An enterprise-grade, evaluation-ready relational ridesharing and multi-user cab 
 
 - [Key Features](#-key-features)
 - [System Architecture](#-system-architecture)
-- [Database Design & ER-to-Relational Mapping](#-database-design--er-to-relational-mapping)
+- [Database Design &amp; ER-to-Relational Mapping](#-database-design--er-to-relational-mapping)
   - [Entity-Relationship Diagram](#entity-relationship-diagram)
-  - [Relational Schema & Constraints](#relational-schema--constraints)
-  - [Database Triggers & Haversine Distance](#database-triggers--haversine-distance)
-  - [Relational Views & Performance Indexes](#relational-views--performance-indexes)
+  - [Relational Schema &amp; Constraints](#relational-schema--constraints)
+  - [Database Triggers &amp; Haversine Distance](#database-triggers--haversine-distance)
+  - [Relational Views &amp; Performance Indexes](#relational-views--performance-indexes)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Environment Variables Configuration](#environment-variables-configuration)
-  - [Database Setup & Seeding](#database-setup--seeding)
+  - [Database Setup &amp; Seeding](#database-setup--seeding)
   - [Running the Application](#running-the-application)
-- [API Reference & CRUD Operations](#-api-reference--crud-operations)
+- [API Reference &amp; CRUD Operations](#-api-reference--crud-operations)
 
 ---
 
@@ -36,7 +36,9 @@ An enterprise-grade, evaluation-ready relational ridesharing and multi-user cab 
 
 - **End-to-End Relational Integrity:** Full relational schema with 6 core entities (`users`, `drivers`, `vehicles`, `rides`, `payments`, `reviews`) plus reference lookup table (`locations`).
 - **In-Database Trigger Fare Calculation:** An automated PostgreSQL `BEFORE INSERT OR UPDATE` trigger computes geographical distance between Bangalore locations using the **Haversine formula** and sets accurate fares server-side:
-  $$\text{Fare} = \text{Base Fare (₹50)} + (\text{Rate/km (₹12)} \times \text{Haversine Distance})$$
+  $$
+  \text{Fare} = \text{Base Fare (₹50)} + (\text{Rate/km (₹12)} \times \text{Haversine Distance})
+  $$
 - **Multi-User Cab Pooling & Fare Splitting:** Smart route compatibility matching (pooling) with progressive dynamic discounts (30% off for 2 riders, 45% for 3 riders, 55% for 4+ riders) and automatic refund calculations for existing passengers when a new rider joins.
 - **Strict Constraint Enforcement:**
   - **1:1 Vehicle Ownership (`owns`):** Enforced via `UNIQUE` constraint on `vehicles(driver_id)`.
@@ -71,7 +73,7 @@ graph TD
 
 ### Entity-Relationship Diagram
 
-![RideShare ER Diagram](./ER%20DIAGRAM.jpeg)
+![RideShare ER Diagram](<./ER%20DIAGRAM.jpeg>)
 
 #### Conceptual ER Design (Chen Notation Breakdown)
 
@@ -160,15 +162,15 @@ erDiagram
 
 ### Relational Schema & Constraints
 
-| Table Name | Primary Key | Foreign Keys & References | Cardinality & Constraints |
-|---|---|---|---|
-| **`users`** | `user_id` (UUID) | None | `email` is `UNIQUE NOT NULL` |
-| **`drivers`** | `driver_id` (UUID) | None | `ratings` default `5.0` (range 0.0 - 5.0) |
-| **`vehicles`** | `vehicle_id` (UUID) | `driver_id` $\to$ `drivers(driver_id)` | **1:1** (`driver_id` is `UNIQUE`), `ON DELETE RESTRICT` |
-| **`rides`** | `ride_id` (UUID) | `user_id` $\to$ `users`, `driver_id` $\to$ `drivers`, `pickup/dropoff` $\to$ `locations` | **1:M** bookings & accepts. Enforces valid locations |
-| **`payments`** | `payment_id` (UUID) | `ride_id` $\to$ `rides(ride_id)` | **1:1** (`ride_id` is `UNIQUE`), `ON DELETE CASCADE` |
-| **`reviews`** | `review_id` (UUID) | `user_id` $\to$ `users(user_id)` | **1:M** reviews, `CHECK (rating BETWEEN 1 AND 5)` |
-| **`locations`** | `name` (TEXT) | None | Reference table storing Bangalore coordinates |
+| Table Name              | Primary Key           | Foreign Keys & References                                                                                  | Cardinality & Constraints                                           |
+| ----------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **`users`**     | `user_id` (UUID)    | None                                                                                                       | `email` is `UNIQUE NOT NULL`                                    |
+| **`drivers`**   | `driver_id` (UUID)  | None                                                                                                       | `ratings` default `5.0` (range 0.0 - 5.0)                       |
+| **`vehicles`**  | `vehicle_id` (UUID) | `driver_id` $\to$ `drivers(driver_id)`                                                               | **1:1** (`driver_id` is `UNIQUE`), `ON DELETE RESTRICT` |
+| **`rides`**     | `ride_id` (UUID)    | `user_id` $\to$ `users`, `driver_id` $\to$ `drivers`, `pickup/dropoff` $\to$ `locations` | **1:M** bookings & accepts. Enforces valid locations          |
+| **`payments`**  | `payment_id` (UUID) | `ride_id` $\to$ `rides(ride_id)`                                                                     | **1:1** (`ride_id` is `UNIQUE`), `ON DELETE CASCADE`    |
+| **`reviews`**   | `review_id` (UUID)  | `user_id` $\to$ `users(user_id)`                                                                     | **1:M** reviews, `CHECK (rating BETWEEN 1 AND 5)`           |
+| **`locations`** | `name` (TEXT)       | None                                                                                                       | Reference table storing Bangalore coordinates                       |
 
 ### Database Triggers & Haversine Distance
 
@@ -283,12 +285,13 @@ execute function calculate_fare();
 ### Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/ParthKhandelwal537/rideshare-dbms.git
    cd rideshare-dbms
    ```
-
 2. **Install project dependencies:**
+
    ```bash
    npm install
    ```
@@ -328,15 +331,13 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🔌 API Reference & CRUD Operations
 
-| Endpoint | Method | Description | DBMS Concept |
-|---|---|---|---|
-| `/api/users` | `GET`, `POST` | Retrieve all riders or register a new rider | `UNIQUE` email/number check |
-| `/api/users/[id]` | `GET`, `DELETE` | Fetch user or delete profile (with cascade options) | Referential Integrity |
-| `/api/drivers` | `GET`, `POST` | Retrieve drivers or add a new verified driver | Entity CRUD |
-| `/api/vehicles` | `GET`, `POST` | Fetch vehicles or link vehicle to driver | **1:1 Owns** (`UNIQUE driver_id`) |
-| `/api/rides` | `GET`, `POST` | Fetch rides by user or book a new ride | **Trigger `trg_calculate_fare`** |
-| `/api/rides/[id]` | `GET`, `PATCH`, `DELETE` | View trip, update route, or cancel booking | `ON DELETE CASCADE` to payments |
-| `/api/payments` | `GET`, `PATCH` | Retrieve payments or complete transaction | 1:1 Payment status update |
-| `/api/admin/overview`| `GET` | Fetch all tables and joined view data | **Relational View** join query |
-
-
+| Endpoint                | Method                         | Description                                         | DBMS Concept                              |
+| ----------------------- | ------------------------------ | --------------------------------------------------- | ----------------------------------------- |
+| `/api/users`          | `GET`, `POST`              | Retrieve all riders or register a new rider         | `UNIQUE` email/number check             |
+| `/api/users/[id]`     | `GET`, `DELETE`            | Fetch user or delete profile (with cascade options) | Referential Integrity                     |
+| `/api/drivers`        | `GET`, `POST`              | Retrieve drivers or add a new verified driver       | Entity CRUD                               |
+| `/api/vehicles`       | `GET`, `POST`              | Fetch vehicles or link vehicle to driver            | **1:1 Owns** (`UNIQUE driver_id`) |
+| `/api/rides`          | `GET`, `POST`              | Fetch rides by user or book a new ride              | **Trigger `trg_calculate_fare`**  |
+| `/api/rides/[id]`     | `GET`, `PATCH`, `DELETE` | View trip, update route, or cancel booking          | `ON DELETE CASCADE` to payments         |
+| `/api/payments`       | `GET`, `PATCH`             | Retrieve payments or complete transaction           | 1:1 Payment status update                 |
+| `/api/admin/overview` | `GET`                        | Fetch all tables and joined view data               | **Relational View** join query      |

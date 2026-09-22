@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message: isShared
-          ? `Shared cab booked — discounted fare ₹${ride.fare} (30% pool discount).`
-          : `Ride booked — fare ₹${ride.fare}.`,
+          ? `Shared cab booked (${passengers_count || 1} seat${(passengers_count || 1) > 1 ? 's' : ''}) — discounted fare ₹${ride.fare}.`
+          : `Private ride booked — fare ₹${ride.fare}.`,
         data: { ride, payment }
       },
       { status: 201 }

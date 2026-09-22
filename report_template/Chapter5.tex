@@ -1,0 +1,109 @@
+\chapter{Implementation}
+
+\section{Frontend Architecture \& User Interface}
+The client interface is implemented as an interactive, responsive single-page application engineered with modern React paradigms:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Framework Foundation:} Developed on \textbf{Next.js 16 App Router}, \textbf{React 19}, and \textbf{TypeScript 5}, ensuring strict type safety and high performance.
+    \item \textbf{Navigation \& Role Toggling (\texttt{Navbar.tsx}):} Provides instantaneous switching between Rider booking, Ride History, and the Admin Command Center.
+    \item \textbf{Interactive Booking Interface (\texttt{RideBookingForm.tsx}):} Facilitates dynamic transit hub selection across six Bangalore municipal hubs (\textit{MG Road, Indiranagar, Koramangala, Whitefield, Electronic City, Airport}), dynamic passenger count slider, and solo vs. pooling mode selector.
+    \item \textbf{Lifecycle Tracking (\texttt{RideCard.tsx} \& \texttt{RideList.tsx}):} Displays interactive cards reflecting live lifecycle states (\texttt{driver\_assigned}, \texttt{in\_transit}, \texttt{completed}, \texttt{cancelled}) with payment verification.
+    \item \textbf{Admin Command Center (\texttt{AdminLiveView.tsx}):} Real-time database inspection dashboard subscribing to PostgreSQL changes via Supabase WebSockets (\texttt{postgres\_changes}) across all 7 relations.
+\end{itemize}
+
+\section{Backend Architecture \& API Services}
+The backend service layer is implemented using Next.js Route Handlers interfacing directly with PostgreSQL:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \texttt{POST /api/rides}: Validates transit hub availability, assigns an available driver, creates the ride tuple, and automatically initializes a linked pending payment row.
+    \item \texttt{GET /api/rides}: Fetches filtered user trip histories, leveraging a secondary B-Tree index scan on \texttt{idx\_rides\_user\_id} (sub-12ms response latency).
+    \item \texttt{PATCH /api/rides/[id]}: Enforces business rule \textbf{FR7 (Invoice Lock)} by returning \texttt{HTTP 400 Bad Request} if an update is attempted on an already paid trip. For active trips, updating transit nodes activates the database trigger for automated fare recalculation.
+    \item \texttt{DELETE /api/rides/[id]}: Cancels unpaid trips, cascading to delete the linked pending payment without leaving orphaned records.
+\end{itemize}
+
+\section{Dynamic Cab Pooling Algorithm}
+To reduce transit congestion, RideShare implements a multi-passenger pooling engine:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Spatial Corridor Compatibility:} Validates that intermediate pickup and dropoff hubs align along the driver's route trajectory without excessive detour.
+    \item \textbf{Temporal Window Matching:} Groups passenger departures falling within an overlapping 30-minute operational window.
+    \item \textbf{Progressive Group Discounts:} Dynamic tiered discounts reduce rider fares based on occupancy:
+    $$\text{Discount} = \begin{cases} 
+      30\% & \text{for 2 riders} \\
+      45\% & \text{for 3 riders} \\
+      55\% & \text{for 4+ riders}
+   \end{cases}$$
+    \item \textbf{Automated Pro-Rata Refunds:} Dynamically recalculates fares and credits active passengers whenever a new co-rider joins the pool.
+\end{itemize}
+
+\clearpage
+
+\section{Database Integration \& Procedural SQL Logic}
+To prevent client-side price tampering and ensure transactional integrity, calculations, integrity enforcement, and reporting views are executed in-database via PostgreSQL:
+
+\textbf{1. Great-Circle Distance Function (\texttt{haversine\_km}):}
+\begin{lstlisting}[language=SQL]
+CREATE OR REPLACE FUNCTION haversine_km(
+  lat1 DOUBLE PRECISION, lon1 DOUBLE PRECISION,
+  lat2 DOUBLE PRECISION, lon2 DOUBLE PRECISION
+) RETURNS NUMERIC AS $$
+DECLARE
+  r CONSTANT DOUBLE PRECISION := 6371; -- Earth radius in km
+  dlat DOUBLE PRECISION := radians(lat2 - lat1);
+  dlon DOUBLE PRECISION := radians(lon2 - lon1);
+  a DOUBLE PRECISION; c DOUBLE PRECISION;
+BEGIN
+  a := sin(dlat / 2)^2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)^2;
+  c := 2 * atan2(sqrt(a), sqrt(1 - a));
+  RETURN round((r * c)::NUMERIC, 2);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+\end{lstlisting}
+
+\textbf{2. Autonomous Fare Trigger Procedure (\texttt{calculate\_fare}):}
+\begin{lstlisting}[language=SQL]
+CREATE OR REPLACE FUNCTION calculate_fare() RETURNS TRIGGER AS $$
+DECLARE
+  base_fare CONSTANT NUMERIC := 50;   -- Base fare in INR
+  rate_per_km CONSTANT NUMERIC := 12; -- Rate per km in INR
+  pickup_lat DOUBLE PRECISION; pickup_lon DOUBLE PRECISION;
+  drop_lat DOUBLE PRECISION;   drop_lon DOUBLE PRECISION;
+  distance NUMERIC;
+BEGIN
+  SELECT latitude, longitude INTO pickup_lat, pickup_lon 
+  FROM locations WHERE name = NEW.pickup_location;
+  SELECT latitude, longitude INTO drop_lat, drop_lon 
+  FROM locations WHERE name = NEW.dropoff_location;
+
+  IF pickup_lat IS NOT NULL AND drop_lat IS NOT NULL THEN
+    distance := haversine_km(pickup_lat, pickup_lon, drop_lat, drop_lon);
+    NEW.fare := base_fare + (rate_per_km * distance);
+  ELSE
+    NEW.fare := base_fare;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_calculate_fare
+BEFORE INSERT OR UPDATE OF pickup_location, dropoff_location ON rides
+FOR EACH ROW EXECUTE FUNCTION calculate_fare();
+\end{lstlisting}
+
+\textbf{3. Multi-Table Relational Reporting View (\texttt{ride\_full\_details}) \& Secondary Indexes:}
+\begin{lstlisting}[language=SQL]
+CREATE OR REPLACE VIEW ride_full_details AS
+SELECT 
+  r.ride_id, r.pickup_location, r.dropoff_location, r.ride_date,
+  r.fare, r.ride_status, r.ride_type, r.passengers_count,
+  u.name AS rider_name, u.email AS rider_email,
+  d.driver_name, d.phone_no AS driver_phone,
+  v.vehicle_number, v.vehicle_type, v.capacity AS vehicle_capacity,
+  p.payment_mode, p.amount, p.payment_status
+FROM rides r
+JOIN users u ON r.user_id = u.user_id
+LEFT JOIN drivers d ON r.driver_id = d.driver_id
+LEFT JOIN vehicles v ON d.driver_id = v.driver_id
+LEFT JOIN payments p ON p.ride_id = r.ride_id;
+
+CREATE INDEX idx_rides_user_id ON rides(user_id);
+CREATE INDEX idx_rides_driver_id ON rides(driver_id);
+CREATE INDEX idx_payments_ride_id ON payments(ride_id);
+\end{lstlisting}

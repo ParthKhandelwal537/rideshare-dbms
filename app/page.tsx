@@ -238,10 +238,10 @@ export default function HomePage() {
               </span>
             </div>
 
-            {/* Standard Solo Fare */}
+            {/* Standard Private Fare */}
             <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800/80 flex flex-col justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Solo Standard Fare
+                Private Standard Fare
               </span>
               <div className="my-2">
                 <span className="text-3xl font-extrabold text-slate-300 font-mono">

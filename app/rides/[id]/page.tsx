@@ -171,11 +171,11 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
   const isPaid = payment?.payment_status === 'completed';
 
   // Dynamic Fare Calculation in Real-Time
-  const baseSoloFare = ride ? calculateFareForLocations(ride.pickup_location, ride.dropoff_location).fare : 0;
+  const baseSoloFare = ride ? calculateFareForLocations(ride.pickup_location, ride.dropoff_location, vehicle?.vehicle_type).fare : 0;
   const totalRiders = sharingType === 'shared' ? 1 + coRiders.length : 1;
   const dynamicFareInfo = calculateDynamicFare(baseSoloFare, sharingType, totalRiders);
 
-  // Switch between Solo and Shared Pool
+  // Switch between Private and Shared Pool
   const handleToggleSharingType = (type: RideType) => {
     if (isPaid) {
       showToast("Payment already completed. Click 'Modify Trip' to change pool or route.", "info");
@@ -664,7 +664,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
               } ${isPaid ? 'opacity-60 cursor-not-allowed' : ''}`}
               title={isPaid ? 'Payment completed. Click Modify Trip to change mode.' : undefined}
             >
-              Solo Cab
+              Private Cab
             </button>
             <button
               type="button"
@@ -796,7 +796,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
             {/* Dynamic Fare Calculation Table */}
             <div className="p-4 rounded-xl bg-slate-950/90 border border-indigo-900/40 space-y-2">
               <div className="flex justify-between text-xs text-slate-400">
-                <span>Standard Solo Fare:</span>
+                <span>Standard Private Fare:</span>
                 <span className="line-through text-slate-500 font-mono">₹{baseSoloFare}</span>
               </div>
               <div className="flex justify-between text-xs text-slate-400">
@@ -847,11 +847,11 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
         ) : (
-          /* Solo Ride Selected */
+          /* Private Ride Selected */
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
-              <span className="font-semibold text-white block">Solo Cab Currently Booked</span>
-              <span>Full vehicle reserved exclusively for 1 passenger. Standard route fare applies. You can invite other solo riders on your route corridor below to pool together and save 30%!</span>
+              <span className="font-semibold text-white block">Private Cab Currently Booked</span>
+              <span>Full vehicle reserved exclusively for your party ({vehicle?.vehicle_type || 'Assigned Cab'}). Standard vehicle rate applies. If you wish to pool together with other corridor riders and save 30%, switch to Shared Pool above!</span>
             </div>
             <span className="text-base font-bold text-white font-mono shrink-0">₹{baseSoloFare}</span>
           </div>
@@ -882,8 +882,8 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
 
           <div className="text-xs text-slate-400">
             {sharingType === 'solo'
-              ? 'You have chosen a private Solo Ride. No automatic pool matching or invitations are dispatched for solo trips. If you wish to pool and save 30%, switch to Shared Cab above.'
-              : 'Shared Pool Ride: Automatically matches with active riders along this route or slightly deviating corridor (departure deviation &le; 30 minutes). You can pool together with 1-click on a first-come, first-served basis up to vehicle capacity!'}
+              ? 'You have chosen a Private Ride. No automatic pool matching or invitations are dispatched for private trips. If you wish to pool and save 30%, switch to Shared Cab above.'
+              : 'Shared Pool Ride: Automatically matches with active riders along this route or slightly deviating corridor (departure deviation ≤ 30 minutes). You can pool together with 1-click on a first-come, first-served basis up to vehicle capacity!'}
           </div>
 
           {matchedBookedRides.length === 0 ? (
@@ -1248,7 +1248,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Edit Ride Modal (Policy: Allowed up to 3 hours before departure) */}
       {showEditModal && (() => {
-        const previewDistAndFare = calculateFareForLocations(editPickup, editDropoff);
+        const previewDistAndFare = calculateFareForLocations(editPickup, editDropoff, vehicle?.vehicle_type);
         const previewRiderCount = editRideType === 'shared' ? Math.max(2, totalRiders) : 1;
         const previewFareObj = calculateDynamicFare(previewDistAndFare.fare, editRideType, previewRiderCount);
         const previewFinalFare = previewFareObj.finalFare;
@@ -1350,7 +1350,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
                     onChange={(e) => setEditRideType(e.target.value as RideType)}
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
                   >
-                    <option value="solo">Solo Cab (Private Vehicle, Standard Fare)</option>
+                    <option value="solo">Private Cab (Exclusive Vehicle, Standard Fare)</option>
                     <option value="shared">Shared Cab (Multi-Rider Pool &middot; 30% Discount)</option>
                   </select>
                 </div>
@@ -1364,7 +1364,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
                   <div className="flex items-center justify-between text-slate-400">
                     <span>Selected Mode:</span>
                     <span className="font-semibold text-slate-200">
-                      {editRideType === 'shared' ? 'Shared Cab (30% Pooling Discount)' : 'Solo Cab'}
+                      {editRideType === 'shared' ? 'Shared Cab (30% Pooling Discount)' : 'Private Cab'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800 font-bold">

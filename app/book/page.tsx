@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { LocationItem } from '@/lib/types';
-import { calculateFareForLocations } from '@/lib/fare';
+import { calculateFareForLocations, calculateBookingFare, getVehiclePricing } from '@/lib/fare';
 import { Car, MapPin, Calendar, ArrowRight, AlertCircle, Calculator, Sparkles, Users, UserCheck } from 'lucide-react';
 
 export default function BookRidePage() {
@@ -73,14 +73,23 @@ export default function BookRidePage() {
   }, [showToast]);
 
   const isSameLocation = pickup === dropoff;
-  const standardEstimate = !isSameLocation
-    ? calculateFareForLocations(pickup, dropoff)
-    : { distanceKm: 0, fare: 0 };
+  const bookingEstimate = !isSameLocation
+    ? calculateBookingFare({
+        pickup,
+        dropoff,
+        vehicleType: vehiclePreference !== 'any' ? vehiclePreference : undefined,
+        rideType,
+        passengersCount,
+      })
+    : {
+        distanceKm: 0,
+        vehicleBaseFare: 0,
+        perSeatFare: 0,
+        finalFare: 0,
+        pricing: getVehiclePricing('any'),
+      };
 
-  // 30% discount if shared ride
-  const effectiveFare = rideType === 'shared'
-    ? Math.round(standardEstimate.fare * 0.70)
-    : standardEstimate.fare;
+  const effectiveFare = bookingEstimate.finalFare;
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,13 +168,13 @@ export default function BookRidePage() {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Ride Booking</span>
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-          <span className="text-xs text-slate-400">Solo & Multi-User Ride Sharing</span>
+          <span className="text-xs text-slate-400">Private & Multi-User Ride Sharing</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Book a Trip
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Select origin and destination. Choose between a <strong>Solo Cab</strong> or <strong>Shared Ride (30% discount)</strong> enforced by vehicle capacity.
+          Select origin and destination. Choose between a <strong>Private Ride</strong> or <strong>Shared Cab (30% discount per seat)</strong> enforced by vehicle capacity.
         </p>
       </div>
 
@@ -224,7 +233,7 @@ export default function BookRidePage() {
             </div>
           </div>
 
-          {/* Ride Mode Selection (Solo vs Shared Pooling) */}
+          {/* Ride Mode Selection (Private vs Shared Pooling) */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
               Trip Mode
@@ -242,11 +251,11 @@ export default function BookRidePage() {
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold flex items-center gap-1.5">
                     <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-                    Solo Ride
+                    Private Ride
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Standard</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Exclusive</span>
                 </div>
-                <div className="text-[11px] text-slate-400">Private vehicle for yourself</div>
+                <div className="text-[11px] text-slate-400">Private vehicle for your party</div>
               </button>
 
               <button
@@ -267,7 +276,7 @@ export default function BookRidePage() {
                     SAVE 30%
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-400">Split fare with co-passengers</div>
+                <div className="text-[11px] text-slate-400">Pay per seat & split with co-riders</div>
               </button>
             </div>
           </div>
@@ -278,18 +287,28 @@ export default function BookRidePage() {
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                 Select Vehicle Category
               </label>
-              <span className="text-[11px] text-blue-400 font-medium">Smart Load-Balanced Driver Assignment</span>
+              <span className="text-[11px] text-blue-400 font-medium">Dynamic Tier Rates & Per-Seat Fares</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {[
-                { id: 'any', name: 'Any Cab', badge: 'Fastest Match', models: 'Auto-assigns idle driver', cap: 0, capText: '4-7 Seats' },
-                { id: 'Hatchback', name: 'Hatchback', badge: 'Swift / i20', models: 'Budget friendly city ride', cap: 4, capText: '4 Seats' },
-                { id: 'Sedan', name: 'Sedan', badge: 'City / Etios', models: 'Smooth ride & spacious trunk', cap: 4, capText: '4 Seats' },
-                { id: 'SUV', name: 'SUV', badge: 'Creta / Innova', models: 'High clearance & 6 seats', cap: 6, capText: '6 Seats' },
-                { id: 'XL MUV', name: 'XL MUV', badge: 'Maruti Ertiga', models: 'Spacious 7 seater capacity', cap: 7, capText: '7 Seats' },
+                { id: 'any', name: 'Any Cab', badge: 'Fastest Match', models: 'Auto-assigns idle driver', cap: 0, capText: '4-7 Seats', rate: '₹12/km' },
+                { id: 'Hatchback', name: 'Hatchback', badge: 'Swift / i20', models: 'Budget friendly city ride', cap: 4, capText: '4 Seats', rate: '₹12/km' },
+                { id: 'Sedan', name: 'Sedan', badge: 'City / Etios', models: 'Smooth ride & comfort', cap: 4, capText: '4 Seats', rate: '₹15/km' },
+                { id: 'SUV', name: 'SUV', badge: 'Creta / Innova', models: 'High clearance & 6 seats', cap: 6, capText: '6 Seats', rate: '₹19/km' },
+                { id: 'XL MUV', name: 'XL MUV', badge: 'Maruti Ertiga', models: 'Spacious 7 seater capacity', cap: 7, capText: '7 Seats', rate: '₹23/km' },
               ].map((veh) => {
                 const isSelected = vehiclePreference === veh.id;
+                const cardFare = !isSameLocation
+                  ? calculateBookingFare({
+                      pickup,
+                      dropoff,
+                      vehicleType: veh.id !== 'any' ? veh.id : undefined,
+                      rideType,
+                      passengersCount,
+                    }).finalFare
+                  : 0;
+
                 return (
                   <button
                     key={veh.id}
@@ -311,7 +330,14 @@ export default function BookRidePage() {
                       </span>
                     </div>
                     <div className="text-[11px] font-semibold text-slate-400 truncate">{veh.badge}</div>
-                    <div className="text-[10px] text-slate-500 truncate mt-0.5">{veh.models}</div>
+                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-800/60 text-[10px]">
+                      <span className="text-slate-500">{veh.rate}</span>
+                      {!isSameLocation && (
+                        <span className={`font-bold font-mono ${isSelected ? 'text-emerald-300' : 'text-slate-300'}`}>
+                          ₹{cardFare}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -390,19 +416,19 @@ export default function BookRidePage() {
               </div>
             </div>
 
-            {/* Explanatory banner for Shared vs Solo */}
+            {/* Explanatory banner for Shared vs Private Ride */}
             {rideType === 'shared' ? (
               <div className="pt-2 border-t border-slate-800/60 text-[11px] text-emerald-300/90 flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>
-                  <strong>Shared Ride Active:</strong> Your {vehiclePreference === 'any' ? 'assigned vehicle' : vehiclePreference} has {getSelectedVehicleMaxCapacity()} total seats. You reserve <strong>{passengersCount} seat(s)</strong>; up to <strong>{getSelectedVehicleMaxCapacity() - passengersCount} co-riders</strong> along your corridor can join on a first-come, first-served basis.
+                  <strong>Shared Cab Active:</strong> Your {vehiclePreference === 'any' ? 'assigned vehicle' : vehiclePreference} has {getSelectedVehicleMaxCapacity()} total seats. You reserve <strong>{passengersCount} seat{passengersCount > 1 ? 's' : ''}</strong> (₹{bookingEstimate.perSeatFare}/seat); up to <strong>{getSelectedVehicleMaxCapacity() - passengersCount} co-riders</strong> along your corridor can join.
                 </span>
               </div>
             ) : (
               <div className="pt-2 border-t border-slate-800/60 text-[11px] text-blue-300/90 flex items-center gap-2">
                 <Car className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 <span>
-                  <strong>Private Solo Cab:</strong> The entire {getSelectedVehicleMaxCapacity()}-seater {vehiclePreference === 'any' ? 'vehicle' : vehiclePreference} is reserved exclusively for your party.
+                  <strong>Private Ride Active:</strong> The entire {getSelectedVehicleMaxCapacity()}-seater {vehiclePreference === 'any' ? 'vehicle' : vehiclePreference} is reserved exclusively for your party ({passengersCount} passenger{passengersCount > 1 ? 's' : ''}).
                 </span>
               </div>
             )}
@@ -470,7 +496,6 @@ export default function BookRidePage() {
                     min={todayStr}
                     onChange={(e) => {
                       setDate(e.target.value);
-                      // If user switches to today and current scheduledTime is now in the past, reset it
                       if (e.target.value === todayStr) {
                         const minT = getNowPlusMins(5);
                         if (scheduledTime < minT) setScheduledTime(minT);
@@ -533,28 +558,63 @@ export default function BookRidePage() {
 
           {/* Business Rule / Distance & Fare Preview */}
           {!isSameLocation && (
-            <div className="bg-blue-950/20 border border-blue-900/30 rounded-xl p-4 space-y-2">
+            <div className="bg-blue-950/20 border border-blue-900/30 rounded-xl p-4 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400 flex items-center gap-1.5">
                   <Calculator className="w-3.5 h-3.5 text-blue-400" />
                   Great-Circle Distance:
                 </span>
-                <span className="font-semibold text-white">{standardEstimate.distanceKm} km</span>
+                <span className="font-semibold text-white">{bookingEstimate.distanceKm} km</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5 text-indigo-400" />
+                  Vehicle Category:
+                </span>
+                <span className="font-medium text-slate-300">
+                  {bookingEstimate.pricing.displayName} &middot; ₹{bookingEstimate.pricing.ratePerKm}/km (Base ₹{bookingEstimate.pricing.baseFare})
+                </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400">
-                  {rideType === 'shared' ? 'Discounted Shared Fare (30% Off):' : 'Standard Solo Fare:'}
+                  {rideType === 'shared' ? (
+                    <span>
+                      Shared Pool Fare (30% Discount):{' '}
+                      <span className="text-slate-300 font-mono">
+                        ₹{bookingEstimate.perSeatFare}/seat &times; {passengersCount} {passengersCount > 1 ? 'seats' : 'seat'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>Standard Private Ride Fare:</span>
+                  )}
                 </span>
                 <div className="text-right">
-                  {rideType === 'shared' && (
-                    <span className="text-xs line-through text-slate-500 mr-2">₹{standardEstimate.fare}</span>
+                  {rideType === 'shared' ? (
+                    <div>
+                      <span className="text-xs line-through text-slate-500 mr-2">
+                        ₹{bookingEstimate.vehicleBaseFare * passengersCount}
+                      </span>
+                      <span className="font-bold text-lg text-emerald-400">₹{effectiveFare}</span>
+                    </div>
+                  ) : (
+                    <span className="font-bold text-lg text-emerald-400">₹{effectiveFare}</span>
                   )}
-                  <span className="font-bold text-base text-emerald-400">₹{effectiveFare}</span>
                 </div>
               </div>
-              <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-800 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>Transparent dynamic fare calculation &middot; Capacity verified</span>
+              <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span>
+                    {rideType === 'shared'
+                      ? `${passengersCount} seat${passengersCount > 1 ? 's' : ''} reserved in shared pool &middot; ₹${bookingEstimate.perSeatFare}/seat`
+                      : `Full ${bookingEstimate.pricing.displayName} private booking for your party`}
+                  </span>
+                </div>
+                {rideType === 'shared' && (
+                  <span className="text-emerald-400 font-semibold font-mono">
+                    Save 30% per seat
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -570,7 +630,7 @@ export default function BookRidePage() {
             ) : (
               <>
                 <Car className="w-4 h-4" />
-                <span>Confirm & Book {rideType === 'shared' ? 'Shared Cab' : 'Solo Ride'}</span>
+                <span>Confirm & Book {rideType === 'shared' ? 'Shared Cab' : 'Private Ride'}</span>
                 <ArrowRight className="w-4 h-4 ml-1" />
               </>
             )}

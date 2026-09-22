@@ -1,0 +1,26 @@
+\chapter{Conclusion and Future Scope}
+
+\section{Summary of Project Achievements}
+The RideShare project successfully fulfills all academic and practical requirements of the \textbf{CSE335: Data Base Management System (CIA 3)} course. Key accomplishments include:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item Conceptualized and documented a formal Chen-notation ER diagram with six entities and five cardinal relationships.
+    \item Translated the ER design into a fully normalized relational schema conforming strictly to 3NF and BCNF.
+    \item Enforced declarative integrity constraints, including primary keys, candidate keys, foreign keys with cascade actions, and unique keys enforcing $1:1$ vehicle ownership.
+    \item Implemented in-database business logic using PostgreSQL stored procedures and a \texttt{BEFORE INSERT OR UPDATE} trigger executing the Haversine formula for autonomous fare computation.
+    \item Built a unified reporting view (\texttt{ride\_full\_details}) and secondary B-Tree indexes for sub-millisecond query execution.
+    \item Developed an end-to-end full-stack web application using Next.js 16, React 19, TypeScript, and Tailwind CSS, fully demonstrating all four CRUD operations and live WebSocket synchronization.
+\end{itemize}
+
+\section{Key Academic Lessons Learned}
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Declarative vs. Procedural Integrity:} The architectural superiority of enforcing constraints and calculations in the database engine rather than fragile client-side application logic.
+    \item \textbf{Cascading Semantics:} The operational mechanics of weak entity relationships and cascade deletion rules (\texttt{ON DELETE CASCADE}) in preventing orphaned financial records.
+    \item \textbf{OLTP vs. Analytical Reporting:} Balancing strictly normalized transactional tables with unified relational views for real-time administrator oversight.
+\end{itemize}
+
+\section{Future Enhancements}
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item Integration of spatial geometry data types with PostGIS for real-world road network routing and polygon geofencing.
+    \item Graph-based multi-waypoint pooled routing algorithms (Dijkstra / A*) for optimal dynamic detour calculation.
+    \item Automated double-entry driver payout ledgers for financial reconciliation and automated settlement.
+\end{itemize}

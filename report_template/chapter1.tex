@@ -1,0 +1,29 @@
+\chapter{Introduction}
+
+\section{Purpose/Overview}
+In the contemporary era of rapid urbanization and digital transformation, metropolitan transportation networks encounter unprecedented operational bottlenecks, including traffic congestion, escalating vehicular emissions, and sub-optimal fleet utilization. Intelligent urban mobility architectures and ridesharing platforms have emerged as essential computational systems designed to streamline point-to-point transit, enhance resource pooling, and provide real-time economic transparency. At the technical core of any scalable, transactional, and concurrent mobility platform lies a robust Relational Database Management System (RDBMS).
+
+The primary purpose of the \textbf{RideShare} project is to conceptualize, rigorously model, and implement an enterprise-grade relational database management system integrated into an interactive, full-stack web application. Developed as a core practical deliverable for the laboratory course \textbf{CSE335: Data Base Management System (CIA 3)}, this project demonstrates the end-to-end database engineering lifecycle. The system bridges theoretical database concepts---formal Entity-Relationship (ER) modeling, Boyce-Codd and Third Normal Form (3NF) relational decomposition, declarative integrity constraints, and ACID transaction semantics---with full-stack engineering execution.
+
+\section{Objective}
+The core objectives of the RideShare project are defined as follows:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Conceptual Entity-Relationship Modeling:} Formulate an unambiguous conceptual ER model using standard Chen notation, capturing primary entities (\texttt{User}, \texttt{Driver}, \texttt{Vehicle}, \texttt{Ride}, \texttt{Payments}, and \texttt{Review}) with strict cardinalities ($1:1$ and $1:M$).
+    \item \textbf{Relational Translation and Normalization:} Systematically map the conceptual schema into a relational schema normalized to 3NF and BCNF, completely eliminating insertion, update, and deletion anomalies.
+    \item \textbf{Declarative Constraint Enforcement:} Guarantee data integrity at the database layer using primary keys, unique constraints, check constraints, and foreign keys with explicit cascade rules (\texttt{ON DELETE CASCADE} and \texttt{ON DELETE RESTRICT}).
+    \item \textbf{In-Database Computational Logic via Triggers:} Implement automated server-side procedures and \texttt{BEFORE INSERT OR UPDATE} triggers in PL/pgSQL to calculate great-circle distances between transit hubs via the Haversine formula.
+    \item \textbf{Relational Views and Performance Indexing:} Establish optimized relational views (\texttt{ride\_full\_details}) to streamline multi-table joins across five entities for administrative oversight, supported by targeted B-Tree secondary indexes.
+    \item \textbf{Full-Stack Integration and CRUD Demonstration:} Develop a high-performance web dashboard using Next.js 16, React 19, TypeScript, and Tailwind CSS, visually demonstrating all four CRUD operations.
+\end{itemize}
+
+\section{Scope of the Project}
+The functional and architectural scope of the RideShare platform includes:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{User Management:} Simulating passwordless rider onboarding with One-Time Password (OTP) verification and profile persistence.
+    \item \textbf{Fleet \& Driver Administration:} Capturing driver credentials, government commercial license identifiers, ratings, and strict $1:1$ binding to vehicles.
+    \item \textbf{Ride Booking \& State Machine:} Real-time ride bookings across major urban transit nodes in Bangalore (MG Road, Indiranagar, Koramangala, Whitefield, Electronic City, Airport) with trip lifecycle states.
+    \item \textbf{Autonomous Fare Calculation:} In-database Haversine formula trigger: $\text{Fare} = \text{Base Fare (Rs. 50)} + [\text{Rate/km (Rs. 12)} \times \text{Distance}]$.
+    \item \textbf{Dynamic Cab Pooling:} Multi-passenger group transit with automated tiered discounts (30\%, 45\%, 55\%) and pro-rata recalculations.
+    \item \textbf{Invoice Lock Integrity:} Once a ride is completed and paid, modifications and cancellations are strictly rejected.
+    \item \textbf{Scope Boundaries:} Live hardware GPS telematics and external banking gateways are simulated to guarantee absolute evaluation reproducibility and zero network-dependent failures.
+\end{itemize}

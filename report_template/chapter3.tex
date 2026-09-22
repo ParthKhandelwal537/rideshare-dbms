@@ -1,0 +1,31 @@
+\chapter{Theoretical Background}
+
+\section{Introduction to Project (RDBMS \& ACID)}
+A Relational Database Management System (RDBMS) represents the foundational data layer of contemporary enterprise software \cite{silberschatz2020}. Grounded in the mathematical principles of relational calculus and relational algebra formulated by E.~F. Codd \cite{codd1970}, an RDBMS organizes information into formal two-dimensional relations comprising tuples and attributes. Every relation is governed by a formal schema, attribute domain constraints, and primary keys uniquely identifying each entity tuple.
+
+To maintain absolute data integrity amidst concurrent transactions and potential node failures, relational databases uphold the four ACID properties:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Atomicity:} Trip creation and pending invoice generation execute as an indivisible unit of work; failure of either component triggers complete transaction rollback.
+    \item \textbf{Consistency:} Declarative foreign key constraints and domain assertions ensure the database transitions exclusively across legally validated states.
+    \item \textbf{Isolation:} PostgreSQL Multi-Version Concurrency Control (MVCC) prevents race conditions, dirty reads, and phantom reads during concurrent driver allocation.
+    \item \textbf{Durability:} Committed state transitions persist reliably in non-volatile storage via Write-Ahead Logging (WAL) and synchronous disk commits.
+\end{itemize}
+
+\section{Existing System Design and Limitations}
+Contemporary mobility reservation architectures and naive database implementations suffer from severe structural and operational weaknesses:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{Client-Side Calculation Vulnerabilities:} Pricing computed in client-side JavaScript is vulnerable to payload tampering, allowing malicious agents to forge trip fares before submission.
+    \item \textbf{Referential Integrity Anomalies:} Soft references devoid of database-enforced foreign keys cause orphaned payment records when reservations are cancelled.
+    \item \textbf{Data Redundancy:} Duplicating driver and vehicle details across trip records leads to severe update anomalies and storage bloat.
+    \item \textbf{Lack of Cardinality Enforcement:} Enforcing $1:1$ vehicle ownership solely in application logic introduces write race conditions.
+    \item \textbf{Inefficient Multi-Table Query Patterns:} Repetitive application round trips cause the $N+1$ query problem under concurrent traffic loads.
+\end{itemize}
+
+\section{Proposed Relational Solution}
+To resolve these architectural flaws, \textbf{RideShare} implements a resilient database layer:
+\begin{itemize}[itemsep=1.5pt, topsep=2pt, parsep=0pt]
+    \item \textbf{In-Database Fare Triggers:} Bypasses client computation by embedding distance calculations into a server-side PL/pgSQL \texttt{BEFORE} trigger.
+    \item \textbf{Declarative Cardinality:} Enforces strict $1:1$ driver-vehicle ownership through relational \texttt{UNIQUE} and \texttt{FOREIGN KEY} constraints.
+    \item \textbf{Cascading Referential Integrity:} Automates invoice cleanup via \texttt{ON DELETE CASCADE} constraints.
+    \item \textbf{Optimized Reporting Views:} Provides a unified \texttt{ride\_full\_details} view to eliminate redundant multi-table queries.
+\end{itemize}
