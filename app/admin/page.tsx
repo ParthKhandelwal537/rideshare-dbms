@@ -299,13 +299,8 @@ export default function AdminDemoPage() {
             {/* VIEW: ride_full_details */}
             {activeTab === 'view' && (
               <div>
-                <div className="p-4 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    <span>Joined SQL View: <strong>ride_full_details</strong> (rides + users + drivers + vehicles + payments)</span>
-                  </div>
-                  <span className="text-slate-500 font-mono">SELECT * FROM ride_full_details</span>
-                </div>
+                {/* search bar */}
+
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-950/80 uppercase text-[10px] font-bold text-slate-400 border-b border-slate-800">
                     <tr>
