@@ -76,11 +76,11 @@ export function getVehiclePricing(vehicleType?: string): VehiclePricing {
 export function calculateFareForLocations(
   pickupName: string,
   dropoffName: string,
-  vehicleType?: string
+  vehicleType?: string | null
 ): { distanceKm: number; fare: number; pricing: VehiclePricing } {
   const pickup = LOCATIONS_DATA[pickupName];
   const dropoff = LOCATIONS_DATA[dropoffName];
-  const pricing = getVehiclePricing(vehicleType);
+  const pricing = getVehiclePricing(vehicleType || undefined);
 
   if (!pickup || !dropoff) {
     return { distanceKm: 0, fare: pricing.baseFare, pricing };

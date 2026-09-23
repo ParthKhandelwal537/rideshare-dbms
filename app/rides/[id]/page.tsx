@@ -171,7 +171,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
   const isPaid = payment?.payment_status === 'completed';
 
   // Dynamic Fare Calculation in Real-Time
-  const baseSoloFare = ride ? calculateFareForLocations(ride.pickup_location, ride.dropoff_location, vehicle?.vehicle_type).fare : 0;
+  const baseSoloFare = ride ? calculateFareForLocations(ride.pickup_location, ride.dropoff_location, vehicle?.vehicle_type || undefined).fare : 0;
   const totalRiders = sharingType === 'shared' ? 1 + coRiders.length : 1;
   const dynamicFareInfo = calculateDynamicFare(baseSoloFare, sharingType, totalRiders);
 
@@ -1248,7 +1248,7 @@ export default function RideDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Edit Ride Modal (Policy: Allowed up to 3 hours before departure) */}
       {showEditModal && (() => {
-        const previewDistAndFare = calculateFareForLocations(editPickup, editDropoff, vehicle?.vehicle_type);
+        const previewDistAndFare = calculateFareForLocations(editPickup, editDropoff, vehicle?.vehicle_type || undefined);
         const previewRiderCount = editRideType === 'shared' ? Math.max(2, totalRiders) : 1;
         const previewFareObj = calculateDynamicFare(previewDistAndFare.fare, editRideType, previewRiderCount);
         const previewFinalFare = previewFareObj.finalFare;
